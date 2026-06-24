@@ -6,6 +6,7 @@
 
 import { RestAPI } from "@webpack/common";
 
+import { addQuestToHistory } from "../core/db";
 import { log, sleep } from "../core/state";
 import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
@@ -19,6 +20,19 @@ export function getTaskInfo(quest: Quest): QuestTaskInfo {
         target: (taskName && config?.tasks?.[taskName]?.target) || 0,
         progress: (taskName && quest.userStatus?.progress?.[taskName]?.value) || 0
     };
+}
+
+export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
+    let name = "Unknown Reward";
+    let orbs = 0;
+    if (quest.config.rewards && quest.config.rewards.length > 0) {
+        name = quest.config.rewards[0].messages?.name || name;
+    }
+    const orbMatch = name.match(/(\d+)\s*orb/i);
+    if (orbMatch) {
+        orbs = parseInt(orbMatch[1], 10);
+    }
+    return { name, orbs };
 }
 
 export function sortQuests(quests: Quest[]): Quest[] {
@@ -121,6 +135,9 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
             });
             if (quest.userStatus) quest.userStatus.claimedAt = new Date().toISOString();
         }
+
+        const reward = getQuestReward(quest);
+        await addQuestToHistory(quest.id, quest.config.messages.questName, reward.name, reward.orbs);
 
         log(`Claim triggered: ${quest.config.messages.questName}`, "success", true);
         return true;

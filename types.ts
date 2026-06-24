@@ -29,9 +29,10 @@ export interface QuestConfig {
     messages: {
         questName: string;
     };
-    taskConfig?: { tasks: Record<string, { target: number } | null>; };
-    taskConfigV2?: { tasks: Record<string, { target: number } | null>; };
+    taskConfig?: { tasks: Record<string, { target: number; } | null>; };
+    taskConfigV2?: { tasks: Record<string, { target: number; } | null>; };
     configVersion?: number;
+    rewards?: { messages?: { name: string, nameWithArticle?: string; }; }[];
 }
 
 export interface QuestUserStatus {
