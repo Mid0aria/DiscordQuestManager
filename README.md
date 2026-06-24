@@ -28,8 +28,8 @@ Since this is a Vencord user plugin, you need to have a local Vencord developmen
     ```
 3. Rebuild and inject Vencord:
     ```bash
-    pnpm build
-    pnpm inject
+    npm build
+    npm inject
     ```
 4. Restart your Discord client.
 
