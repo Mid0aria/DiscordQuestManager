@@ -47,7 +47,7 @@ export function QuestOverlay() {
                 <div className="vc-quest-overlay-title">
                     <StatusIcon status={workerStatus} />
                     Quest Manager
-                    {AppState.nextHeartbeatTime && AppState.nextHeartbeatTime > now && (
+                    {AppState.nextHeartbeatTime && AppState.nextHeartbeatTime > now && workerStatus === "running" && (
                         <span style={{ fontSize: "10px", opacity: 0.8, textTransform: "none", color: "var(--text-muted, #949ba4)", marginLeft: "4px" }}>
                             ({Math.ceil((AppState.nextHeartbeatTime - now) / 1000)}s)
                         </span>

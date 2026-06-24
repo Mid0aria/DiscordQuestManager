@@ -25,13 +25,31 @@ export function getTaskInfo(quest: Quest): QuestTaskInfo {
 export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
     let name = "Unknown Reward";
     let orbs = 0;
-    if (quest.config.rewards && quest.config.rewards.length > 0) {
-        name = quest.config.rewards[0].messages?.name || name;
+
+    const rewards = quest.config?.rewards || (quest.config as any)?.rewardsConfig?.rewards || (quest as any)?.rewards;
+
+    if (rewards && rewards.length > 0) {
+        name = rewards[0].messages?.name || rewards[0].name || name;
+        if (rewards[0].orbQuantity) {
+            orbs = rewards[0].orbQuantity;
+        }
+    } else if ((quest.config as any)?.messages?.rewardName) {
+        name = (quest.config as any).messages.rewardName;
     }
-    const orbMatch = name.match(/(\d+)\s*orb/i);
-    if (orbMatch) {
-        orbs = parseInt(orbMatch[1], 10);
+
+    if (name === "Unknown Reward") {
+        console.warn("[QuestManager] Could not determine reward for quest:", quest.config?.messages?.questName, quest);
     }
+
+    if (!orbs) {
+        const orbMatch = name.match(/(\d+)\s*orb/i);
+        if (orbMatch) {
+            orbs = parseInt(orbMatch[1], 10);
+        } else if (quest.userStatus && (quest.userStatus as any).orbQuantityClaimed) {
+            orbs = (quest.userStatus as any).orbQuantityClaimed;
+        }
+    }
+
     return { name, orbs };
 }
 

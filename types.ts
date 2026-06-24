@@ -32,7 +32,7 @@ export interface QuestConfig {
     taskConfig?: { tasks: Record<string, { target: number; } | null>; };
     taskConfigV2?: { tasks: Record<string, { target: number; } | null>; };
     configVersion?: number;
-    rewards?: { messages?: { name: string, nameWithArticle?: string; }; }[];
+    rewards?: { messages?: { name: string, nameWithArticle?: string; }; orbQuantity?: number; }[];
 }
 
 export interface QuestUserStatus {

@@ -83,7 +83,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                 <div className="vc-quest-hero-badge" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                     <StatusIcon status={workerStatus} />
                                     <span>{statusLabel}</span>
-                                    {AppState.nextHeartbeatTime && AppState.nextHeartbeatTime > now && (
+                                    {AppState.nextHeartbeatTime && AppState.nextHeartbeatTime > now && workerStatus === "running" && (
                                         <span style={{ fontSize: "11px", opacity: 0.8, textTransform: "none", color: "var(--text-muted, #949ba4)" }}>
                                             (Ping in {Math.ceil((AppState.nextHeartbeatTime - now) / 1000)}s)
                                         </span>
@@ -123,15 +123,15 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         )}
                     </div>
 
-                    <div className="vc-quest-tabs" style={{ display: "flex", gap: "16px", padding: "0 24px", borderBottom: "1px solid var(--background-modifier-accent)", marginTop: "16px" }}>
+                    <div className="vc-quest-tab-container">
                         <div
-                            style={{ padding: "8px 0", cursor: "pointer", borderBottom: activeTab === "quests" ? "2px solid var(--brand-experiment)" : "2px solid transparent", color: activeTab === "quests" ? "var(--header-primary)" : "var(--text-muted)", fontWeight: activeTab === "quests" ? 600 : 400 }}
+                            className={`vc-quest-tab ${activeTab === "quests" ? "active" : ""}`}
                             onClick={() => setActiveTab("quests")}
                         >
                             Quests
                         </div>
                         <div
-                            style={{ padding: "8px 0", cursor: "pointer", borderBottom: activeTab === "stats" ? "2px solid var(--brand-experiment)" : "2px solid transparent", color: activeTab === "stats" ? "var(--header-primary)" : "var(--text-muted)", fontWeight: activeTab === "stats" ? 600 : 400 }}
+                            className={`vc-quest-tab ${activeTab === "stats" ? "active" : ""}`}
                             onClick={() => setActiveTab("stats")}
                         >
                             Stats & History
@@ -209,16 +209,16 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                 <>
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                                         <div className="vc-quest-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                                            <span style={{ fontSize: "14px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>Total Earned Orbs</span>
-                                            <div style={{ fontSize: "36px", fontWeight: 800, color: "var(--text-normal)", display: "flex", alignItems: "center", gap: "12px" }}>
-                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="var(--brand-experiment)" stroke="none"><circle cx="12" cy="12" r="10" /></svg>
+                                            <span style={{ fontSize: "14px", color: "#b5bac1", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>Total Earned Orbs</span>
+                                            <div style={{ fontSize: "36px", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "12px" }}>
+                                                <video src="https://cdn.discordapp.com/assets/content/b8fe318002139f2fabd6255aef10a0a625bb10aa9f8394efd6575115c1dca19a.webm" autoPlay loop muted playsInline width="36" height="36" style={{ pointerEvents: "none" }} />
                                                 {userStats.totalOrbs.toLocaleString()}
                                             </div>
                                         </div>
                                         <div className="vc-quest-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
-                                            <span style={{ fontSize: "14px", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>Completed Quests</span>
-                                            <div style={{ fontSize: "36px", fontWeight: 800, color: "var(--text-normal)", display: "flex", alignItems: "center", gap: "12px" }}>
-                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--status-positive)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" /></svg>
+                                            <span style={{ fontSize: "14px", color: "#b5bac1", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>Completed Quests</span>
+                                            <div style={{ fontSize: "36px", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "12px" }}>
+                                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#23a559" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
                                                 {userStats.totalQuests.toLocaleString()}
                                             </div>
                                         </div>
@@ -237,7 +237,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                                         <span className="vc-quest-list-item-name">{h.name}</span>
                                                         <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", gap: "6px", alignItems: "center" }}>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--brand-experiment)" stroke="none"><circle cx="12" cy="12" r="10" /></svg>
+                                                            <video src="https://cdn.discordapp.com/assets/content/b8fe318002139f2fabd6255aef10a0a625bb10aa9f8394efd6575115c1dca19a.webm" autoPlay loop muted playsInline width="16" height="16" style={{ pointerEvents: "none" }} />
                                                             {h.orbs > 0 ? `+${h.orbs} Orbs` : h.rewardName}
                                                         </span>
                                                     </div>
