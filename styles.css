@@ -1,0 +1,524 @@
+
+
+.vc-quest-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+    background: var(--background-primary);
+    border-radius: 16px;
+    border: 1px solid var(--background-modifier-accent);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    animation: vc-quest-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vc-quest-fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.97) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.vc-quest-hero {
+    position: relative;
+    border-radius: 12px;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, rgba(88, 101, 242, 0.12), rgba(235, 69, 158, 0.04));
+    border: 1px solid rgba(88, 101, 242, 0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.vc-quest-hero::before {
+    content: "";
+    position: absolute;
+    top: -50px;
+    right: -30px;
+    width: 150px;
+    height: 150px;
+    background: var(--brand-experiment);
+    filter: blur(60px);
+    opacity: 0.25;
+    pointer-events: none;
+}
+
+.vc-quest-hero-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 1;
+}
+
+.vc-quest-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    background: var(--background-secondary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-normal, #dbdee1);
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--background-modifier-accent);
+}
+
+.vc-quest-hero-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--header-primary, #ffffff);
+    margin: 0 0 4px 0;
+    line-height: 1.2;
+}
+
+.vc-quest-hero-subtitle {
+    font-size: 13px;
+    color: var(--text-muted, #949ba4);
+    margin: 0;
+    font-weight: 500;
+}
+
+.vc-quest-hero-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.vc-quest-progress-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    font-family: "gg sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.vc-quest-progress-container.vc-compact {
+    margin-top: 0;
+    gap: 4px;
+}
+
+.vc-quest-progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--header-primary, #f2f3f5);
+    font-weight: 700;
+}
+
+.vc-quest-progress-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.vc-quest-progress-container.vc-compact .vc-quest-progress-title {
+    font-size: 10px;
+}
+
+.vc-quest-progress-title svg {
+    color: var(--text-warning, #faa61a);
+
+    filter: drop-shadow(0 0 4px rgba(250, 166, 26, 0.4));
+}
+
+.vc-quest-progress-pct {
+    font-size: 14px;
+    color: var(--text-brand, #5865F2);
+
+}
+
+.vc-quest-progress-container.vc-compact .vc-quest-progress-pct {
+    font-size: 12px;
+}
+
+.vc-quest-progress-track {
+    position: relative;
+    width: 100%;
+    height: 14px;
+    background-color: var(--background-modifier-active, rgba(79, 84, 92, 0.48));
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.vc-quest-progress-container.vc-compact .vc-quest-progress-track {
+    height: 8px;
+
+}
+
+.vc-quest-progress-fill {
+    position: relative;
+    height: 100%;
+    background: linear-gradient(90deg, #5865F2, #a1aeff);
+
+    border-radius: 8px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+}
+
+.vc-quest-progress-glow {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    width: 20px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6));
+    border-radius: 0 8px 8px 0;
+    box-shadow: 0 0 10px rgba(161, 174, 255, 0.8);
+}
+
+.vc-quest-progress-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted, #949ba4);
+    font-weight: 500;
+}
+
+.vc-quest-progress-container.vc-compact .vc-quest-progress-footer {
+    font-size: 10px;
+}
+
+.vc-quest-action-bar {
+    display: flex;
+    gap: 12px;
+}
+
+.vc-quest-action-bar > button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.vc-quest-action-bar > button:active {
+    transform: scale(0.97);
+}
+
+.vc-quest-btn-glow {
+    box-shadow: 0 4px 15px rgba(88, 101, 242, 0.3);
+}
+
+.vc-quest-btn-glow:hover {
+    box-shadow: 0 6px 20px rgba(88, 101, 242, 0.5);
+}
+
+.vc-quest-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+@media (max-width: 700px) {
+    .vc-quest-action-bar {
+        flex-direction: column;
+    }
+
+    .vc-quest-hero-header {
+        flex-direction: column;
+        gap: 16px;
+    }
+}
+
+.vc-quest-panel {
+    background: var(--background-secondary);
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid var(--background-modifier-accent);
+    display: flex;
+    flex-direction: column;
+}
+
+.vc-quest-panel-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--header-secondary, #b9bbbe);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-quest-count {
+    background: var(--background-tertiary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--text-normal, #dbdee1);
+}
+
+.vc-quest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.vc-quest-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.vc-quest-list::-webkit-scrollbar-thumb {
+    background-color: var(--background-tertiary);
+    border-radius: 3px;
+}
+
+.vc-quest-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--background-primary);
+    border-radius: 10px;
+    border-left: 4px solid transparent;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.vc-quest-list-item:hover {
+    background: var(--background-modifier-hover);
+    transform: translateX(2px);
+    border-color: var(--background-modifier-accent);
+}
+
+.vc-quest-list-item.active {
+    border-left-color: var(--brand-experiment);
+    background: rgba(88, 101, 242, 0.08);
+    border-color: rgba(88, 101, 242, 0.2);
+}
+
+.vc-quest-list-item.completed {
+    opacity: 0.7;
+}
+
+.vc-quest-list-item.completed:hover {
+    opacity: 1;
+}
+
+.vc-quest-list-item-name {
+    font-weight: 600;
+    color: var(--header-primary, #ffffff);
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 60%;
+}
+
+.vc-quest-list-item-type {
+    font-size: 11px;
+    color: var(--text-muted, #949ba4);
+    background: var(--background-tertiary);
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vc-quest-empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-muted, #949ba4);
+    background: var(--background-primary);
+    border-radius: 10px;
+    border: 2px dashed var(--background-modifier-accent);
+    font-weight: 500;
+    font-size: 13px;
+}
+
+.vc-quest-status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.vc-quest-status-dot.running {
+    background-color: var(--info-positive-background);
+    box-shadow: 0 0 8px var(--info-positive-background);
+    animation: vc-quest-pulse 1.5s infinite;
+}
+
+.vc-quest-status-dot.paused {
+    background-color: var(--info-warning-background);
+}
+
+.vc-quest-status-dot.idle {
+    background-color: var(--text-muted, #949ba4);
+}
+
+@keyframes vc-quest-pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(87, 242, 135, 0.7);
+    }
+
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(87, 242, 135, 0);
+    }
+
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(87, 242, 135, 0);
+    }
+}
+
+#vc-quest-overlay-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 2147483647;
+    pointer-events: none;
+}
+
+.vc-quest-overlay {
+    pointer-events: auto;
+    width: 260px;
+    background: rgba(17, 18, 20, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 12px;
+    box-shadow: var(--elevation-high);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: vc-quest-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vc-quest-slide-up {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.vc-quest-overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.vc-quest-overlay-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--header-secondary, #b9bbbe);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+}
+
+.vc-quest-overlay-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vc-quest-overlay-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--header-primary, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vc-quest-overlay-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-quest-overlay-progress-bg {
+    flex: 1;
+    height: 6px;
+    background: var(--background-modifier-active);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.vc-quest-overlay-progress-fill {
+    height: 100%;
+    background: var(--brand-experiment);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.vc-quest-overlay-progress-text {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-quest-overlay-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.vc-quest-overlay-btn {
+    flex: 1;
+    background: var(--background-modifier-accent);
+    color: var(--text-normal, #dbdee1);
+    border: none;
+    border-radius: 6px;
+    padding: 6px 0;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vc-quest-overlay-btn:hover {
+    background: var(--background-modifier-hover);
+}
+
+.vc-quest-overlay-btn.vc-quest-btn-brand {
+    background: var(--brand-experiment);
+    color: #fff;
+}
+
+.vc-quest-overlay-btn.vc-quest-btn-brand:hover {
+    background: var(--brand-experiment-500);
+}
+
+.vc-quest-overlay-btn.vc-quest-btn-green {
+    background: var(--info-positive-background);
+    color: #fff;
+}
+
+.vc-quest-overlay-btn.vc-quest-btn-green:hover {
+    filter: brightness(1.1);
+}
