@@ -23,7 +23,8 @@ Since this is a Vencord user plugin, you need to have a local Vencord developmen
 1. Open your terminal and navigate to your Vencord `src/userplugins/` directory.
 2. Clone this repository:
     ```bash
-    git clone https://github.com/Mid0aria/DiscordQuestManager.git  cd QuestManager
+    git clone https://github.com/Mid0aria/DiscordQuestManager.git
+    cd QuestManager
     ```
 3. Rebuild and inject Vencord:
     ```bash
