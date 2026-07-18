@@ -62,11 +62,15 @@ export async function spoofDispatcherEvent(
     AppState.nextHeartbeatTime = Date.now() + 60000;
 
     return new Promise<void>(resolve => {
+        let finished = false;
         const listener = (data: any) => {
-            if (AppState.pauseManager.isPaused || !isRunning) {
-                if (!isRunning) cleanup();
+            if (finished) return;
+
+            if (!isRunning) {
+                finish();
                 return;
             }
+            if (AppState.pauseManager.isPaused) return;
 
             AppState.nextHeartbeatTime = Date.now() + 60000;
 
@@ -74,13 +78,23 @@ export async function spoofDispatcherEvent(
                 ? data.userStatus.streamProgressSeconds
                 : Math.floor(data.userStatus.progress[taskInfo.name!].value);
 
-            if (progress >= taskInfo.target) {
-                cleanup();
-                AppState.nextHeartbeatTime = null;
-                FluxDispatcher.unsubscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", listener);
-                resolve();
-            }
+            if (progress >= taskInfo.target) finish();
         };
+
+        function finish() {
+            if (finished) return;
+            finished = true;
+            cleanup();
+            AppState.nextHeartbeatTime = null;
+            AppState.spoofers.cancelActiveTask = null;
+            FluxDispatcher.unsubscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", listener);
+            resolve();
+        }
+
+        // Lets the worker force this task to end immediately (e.g. on plugin stop)
+        // instead of waiting for a heartbeat event that may never arrive once the
+        // spoof has been torn down, which previously left the listener subscribed forever.
+        AppState.spoofers.cancelActiveTask = finish;
         FluxDispatcher.subscribe("QUESTS_SEND_HEARTBEAT_SUCCESS", listener);
     });
 }
@@ -89,13 +103,20 @@ export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promis
     const appId = quest.config.application.id;
     const res = await RestAPI.get({ url: `/applications/public?application_ids=${appId}` });
     const appData = (res.body as any[])[0];
-    const exeName = appData.executables?.find((x: any) => x.os === "win32")?.name?.replace(">", "")
+    const platform = (window as any).DiscordNative?.process?.platform ?? "win32";
+    const exeName = appData.executables?.find((x: any) => x.os === platform)?.name?.replace(">", "")
+        ?? appData.executables?.find((x: any) => x.os === "win32")?.name?.replace(">", "")
         ?? appData.name.replace(/[/\\:*?"<>|]/g, "");
 
+    const isWindows = platform !== "darwin" && platform !== "linux";
     const fakeGame = {
-        cmdLine: `C:\\Program Files\\${appData.name}\\${exeName}`,
+        cmdLine: isWindows
+            ? `C:\\Program Files\\${appData.name}\\${exeName}`
+            : `/Applications/${appData.name}.app/Contents/MacOS/${exeName}`,
         exeName,
-        exePath: `c:/program files/${appData.name.toLowerCase()}/${exeName}`,
+        exePath: isWindows
+            ? `c:/program files/${appData.name.toLowerCase()}/${exeName}`
+            : `/applications/${appData.name.toLowerCase()}.app/contents/macos/${exeName}`,
         hidden: false,
         isLauncher: false,
         id: appId,

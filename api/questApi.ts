@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { RestAPI } from "@webpack/common";
+import { NavigationRouter, RestAPI } from "@webpack/common";
 
 import { addQuestToHistory } from "../core/db";
 import { log, sleep } from "../core/state";
@@ -76,7 +76,6 @@ export function buildQueue(): Quest[] {
     const quests = [...QuestsStore.quests.values()] as Quest[];
     const filtered = quests
         .filter(x => {
-            if (x.id === "1412491570820812933") return false;
             if (!x.userStatus?.enrolledAt || x.userStatus?.completedAt) return false;
             if (new Date(x.config.expiresAt).getTime() <= Date.now()) return false;
 
@@ -162,7 +161,6 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
     } catch (e) {
         log("Failed to claim reward. Redirecting for manual claim...", "warn", true);
         try {
-            const { NavigationRouter } = require("@webpack/common");
             NavigationRouter.transitionTo("/quest-home");
         } catch { }
         return false;

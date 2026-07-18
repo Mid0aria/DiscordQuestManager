@@ -25,7 +25,7 @@ export const ProgressBar = ({ progress, target, compact = false }: ProgressBarPr
             role="progressbar"
             aria-valuenow={progress}
             aria-valuemin={0}
-            aria-valuemax={target}
+            aria-valuemax={Math.max(target, progress, 1)}
         >
             <div className="vc-quest-progress-header">
                 <div className="vc-quest-progress-title">

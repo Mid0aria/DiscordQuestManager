@@ -69,7 +69,9 @@ export default definePlugin({
         await onceReady;
         if (!this.isRunning) return;
 
-        setTimeout(() => checkForUpdatesAndNotify(), 10000);
+        if (settings.store.autoCheckUpdates) {
+            setTimeout(() => checkForUpdatesAndNotify(), 10000);
+        }
 
         if (settings.store.autoStart) {
             initQueue(true);

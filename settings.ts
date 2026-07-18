@@ -94,5 +94,10 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show a widget in the bottom right corner with the active quest status.",
         default: true
+    },
+    autoCheckUpdates: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically check for QuestManager updates (git pull) shortly after Discord starts.",
+        default: true
     }
 });

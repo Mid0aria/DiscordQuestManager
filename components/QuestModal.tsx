@@ -8,12 +8,13 @@ import { ButtonCompat } from "@components/Button";
 import { ModalContent, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { React, showToast, ThemeStore, Toasts, useEffect, useState } from "@webpack/common";
 
-import { claimQuestReward, getAllQuests, getTaskInfo } from "../api/questApi";
+import { claimQuestReward, getAllQuests, getTaskInfo, getUnenrolledQuests } from "../api/questApi";
 import { applyUpdate, checkForUpdates, isOutdated } from "../api/updater";
+import { getUserStats } from "../core/db";
 import { AppState, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
-import { enrollAllAndRun, initQueue, pauseWorker, resumeWorker, runWorker } from "../core/worker";
-import { Quest } from "../types";
+import { enrollAll, enrollQuest, initQueue, pauseWorker, resumeWorker, runWorker } from "../core/worker";
+import { ORB_ICON_URL, Quest } from "../types";
 import { ProgressBar } from "./ProgressBar";
 import { QuestListItem } from "./QuestListItem";
 import { StatusIcon } from "./StatusIcon";
@@ -39,7 +40,6 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
 
     useEffect(() => {
         if (activeTab === "stats") {
-            const { getUserStats } = require("../core/db");
             getUserStats().then((s: any) => setUserStats(s));
         }
     }, [activeTab]);
@@ -67,6 +67,9 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
     const completedQuests = allQuests.filter(q => q.userStatus?.completedAt);
     const claimedQuests = completedQuests.filter(q => q.userStatus?.claimedAt);
     const unclaimedQuests = completedQuests.filter(q => !q.userStatus?.claimedAt);
+    const unenrolledQuests = getUnenrolledQuests();
+
+    const refresh = () => setNow(Date.now());
 
     const ModalRootCmp = ModalRoot as any;
     const ModalContentCmp = ModalContent as any;
@@ -141,9 +144,13 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                     {activeTab === "quests" ? (
                         <>
                             <div className="vc-quest-action-bar">
-                                <ButtonCompat color={ButtonCompat.Colors.BRAND} onClick={() => enrollAllAndRun()} className="vc-quest-btn-glow">
+                                <ButtonCompat color={ButtonCompat.Colors.BRAND} onClick={() => enrollAll().then(refresh)} className="vc-quest-btn-glow" disabled={unenrolledQuests.length === 0}>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>
-                                    Enroll All and Start
+                                    Enroll All
+                                </ButtonCompat>
+                                <ButtonCompat color={ButtonCompat.Colors.GREEN} onClick={() => runWorker()} disabled={activeWorker || queue.length === 0}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                                    Start
                                 </ButtonCompat>
                                 <ButtonCompat color={ButtonCompat.Colors.PRIMARY} look={ButtonCompat.Looks.LINK} onClick={() => initQueue()}>
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
@@ -164,6 +171,28 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                             </div>
 
                             <div className="vc-quest-grid" style={{ gridTemplateColumns: "1fr" }}>
+                                <div className="vc-quest-panel">
+                                    <h3 className="vc-quest-panel-title">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M8.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM20 8v6M23 11h-6" /></svg>
+                                        Not Enrolled <span className="vc-quest-count">{unenrolledQuests.length}</span>
+                                    </h3>
+                                    <div className="vc-quest-list">
+                                        {unenrolledQuests.length === 0 ? (
+                                            <div className="vc-quest-empty-state"><span>No unenrolled quests.</span></div>
+                                        ) : unenrolledQuests.map(q => (
+                                            <div
+                                                key={q.id}
+                                                className="vc-quest-list-item"
+                                                style={{ cursor: "pointer" }}
+                                                onClick={() => enrollQuest(q).then(refresh)}
+                                            >
+                                                <span className="vc-quest-list-item-name">{q.config.messages.questName}</span>
+                                                <span className="vc-quest-list-item-type">Enroll</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
                                 <div className="vc-quest-panel">
                                     <h3 className="vc-quest-panel-title">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" /></svg>
@@ -191,7 +220,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                 key={q.id}
                                                 className="vc-quest-list-item claimable"
                                                 style={{ borderColor: "var(--brand-experiment)", cursor: "pointer" }}
-                                                onClick={() => claimQuestReward(q)}
+                                                onClick={() => claimQuestReward(q).then(refresh)}
                                             >
                                                 <span className="vc-quest-list-item-name">🎁 {q.config.messages.questName}</span>
                                                 <span className="vc-quest-list-item-type" style={{ background: "var(--brand-experiment)", color: "#fff" }}>
@@ -211,7 +240,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                         <div className="vc-quest-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
                                             <span style={{ fontSize: "14px", color: "#b5bac1", textTransform: "uppercase", fontWeight: 600, letterSpacing: "0.5px" }}>Total Earned Orbs</span>
                                             <div style={{ fontSize: "36px", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "12px" }}>
-                                                <video src="https://cdn.discordapp.com/assets/content/b8fe318002139f2fabd6255aef10a0a625bb10aa9f8394efd6575115c1dca19a.webm" autoPlay loop muted playsInline width="36" height="36" style={{ pointerEvents: "none" }} />
+                                                <video src={ORB_ICON_URL} autoPlay loop muted playsInline width="36" height="36" style={{ pointerEvents: "none" }} />
                                                 {userStats.totalOrbs.toLocaleString()}
                                             </div>
                                         </div>
@@ -237,7 +266,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                                         <span className="vc-quest-list-item-name">{h.name}</span>
                                                         <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", gap: "6px", alignItems: "center" }}>
-                                                            <video src="https://cdn.discordapp.com/assets/content/b8fe318002139f2fabd6255aef10a0a625bb10aa9f8394efd6575115c1dca19a.webm" autoPlay loop muted playsInline width="16" height="16" style={{ pointerEvents: "none" }} />
+                                                            <video src={ORB_ICON_URL} autoPlay loop muted playsInline width="16" height="16" style={{ pointerEvents: "none" }} />
                                                             {h.orbs > 0 ? `+${h.orbs} Orbs` : h.rewardName}
                                                         </span>
                                                     </div>

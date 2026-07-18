@@ -9,6 +9,7 @@ import { SelectedChannelStore } from "@webpack/common";
 import { buildQueue, claimQuestReward, enroll, getTaskInfo, getUnenrolledQuests, sortQuests } from "../api/questApi";
 import { playActivity, playDesktop, streamDesktop, watchVideo } from "../api/taskHandlers";
 import { settings } from "../settings";
+import { Quest } from "../types";
 import { AppState, isRunning, log, setRunning } from "./state";
 import { QuestsStore } from "./stores";
 
@@ -59,7 +60,8 @@ export async function runWorker(): Promise<void> {
                     }
                 }
             }
-        } catch {
+        } catch (e) {
+            console.error("[QuestManager]", e);
             log(`Error: ${quest.config?.messages?.questName} failed.`, "error", true);
         }
 
@@ -88,7 +90,16 @@ export function resumeWorker() {
     log("Quest process resuming... ▶️", "success", true);
 }
 
-export async function enrollAllAndRun(): Promise<void> {
+export async function enrollQuest(quest: Quest): Promise<boolean> {
+    const ok = await enroll(quest);
+    if (ok && !AppState.queue.some(xq => xq.id === quest.id)) {
+        AppState.queue.push(quest);
+        AppState.queue = sortQuests(AppState.queue);
+    }
+    return ok;
+}
+
+export async function enrollAll(): Promise<void> {
     const unenrolled = getUnenrolledQuests();
     if (!unenrolled.length) {
         log("No new quests to enroll in.", "warn", true);
@@ -97,14 +108,8 @@ export async function enrollAllAndRun(): Promise<void> {
 
     log(`Enrolling in ${unenrolled.length} new quests...`, "info", true);
     for (const q of unenrolled) {
-        if (await enroll(q) && !AppState.queue.some(xq => xq.id === q.id)) {
-            AppState.queue.push(q);
-        }
+        await enrollQuest(q);
     }
-
-    AppState.queue = sortQuests(AppState.queue);
-
-    runWorker();
 }
 
 export function initQueue(autoRun: boolean = false): void {
@@ -126,6 +131,7 @@ export function initQueue(autoRun: boolean = false): void {
 export function stopAndCleanup(): void {
     setRunning(false);
     AppState.pauseManager.resume();
+    if (AppState.spoofers.cancelActiveTask) AppState.spoofers.cancelActiveTask();
     if (AppState.spoofers.restoreGame) AppState.spoofers.restoreGame();
     if (AppState.spoofers.restoreStream) AppState.spoofers.restoreStream();
 }

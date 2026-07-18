@@ -15,17 +15,43 @@ const isFlatpak = process.platform === "linux" && Boolean(process.env.FLATPAK_ID
 if (process.platform === "darwin") process.env.PATH = `/usr/local/bin:${process.env.PATH}`;
 
 const VENCORD_USER_PLUGIN_DIR = join(__dirname, "..", "src", "userplugins");
+
+// Files that only exist together in this plugin's own folder, used to confirm we
+// resolved the right directory (in case the folder was renamed from "QuestManager").
+const MARKER_FILES = ["questApi.ts", "QuestModal.tsx"];
+
+let cachedCwd: string | null = null;
+
+const dirLooksLikeQuestManager = async (dir: string) => {
+    try {
+        const files = await readdir(dir);
+        return MARKER_FILES.every(f => files.includes(f));
+    } catch {
+        return false;
+    }
+};
+
 const getCwd = async () => {
+    if (cachedCwd) return cachedCwd;
+
+    const defaultDir = join(VENCORD_USER_PLUGIN_DIR, "QuestManager");
+    if (await dirLooksLikeQuestManager(defaultDir)) {
+        cachedCwd = defaultDir;
+        return cachedCwd;
+    }
+
     const dirs = await readdir(VENCORD_USER_PLUGIN_DIR, { withFileTypes: true });
     for (const dir of dirs) {
         if (!dir.isDirectory()) continue;
         const pluginDir = join(VENCORD_USER_PLUGIN_DIR, dir.name);
-        const files = await readdir(pluginDir);
-        if (files.includes("QuestModal.tsx") || files.includes("questApi.ts") || files.includes("README.md") && files.includes("settings.ts")) {
-            return pluginDir;
+        if (await dirLooksLikeQuestManager(pluginDir)) {
+            cachedCwd = pluginDir;
+            return cachedCwd;
         }
     }
-    return join(VENCORD_USER_PLUGIN_DIR, "QuestManager");
+
+    cachedCwd = defaultDir;
+    return cachedCwd;
 };
 
 export interface GitResult {
@@ -50,7 +76,10 @@ export interface GitInfo {
 }
 
 async function git(...args: string[]): Promise<GitResult> {
-    const opts: ExecFileOptions = { cwd: await getCwd(), shell: true };
+    // No `shell: true` here on purpose: execFile passes args directly to the
+    // process without shell interpretation, which avoids command injection via
+    // branch names or other values that end up interpolated into args below.
+    const opts: ExecFileOptions = { cwd: await getCwd() };
     try {
         let result;
         if (isFlatpak) {
@@ -97,7 +126,7 @@ export async function questManagerGetNewCommits(): Promise<GitResult> {
 
     try {
         await git("fetch");
-        const logOutput = await git("log", `--format="${logFormat}"`, branchRange);
+        const logOutput = await git("log", `--format=${logFormat}`, branchRange);
 
         if (!logOutput.ok) return logOutput;
         if (logOutput.value.trim() === "") return { ok: true, value: [] };

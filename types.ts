@@ -14,6 +14,8 @@ export const SUPPORTED_TASKS = [
 
 export type SupportedTask = typeof SUPPORTED_TASKS[number];
 
+export const ORB_ICON_URL = "https://cdn.discordapp.com/assets/content/b8fe318002139f2fabd6255aef10a0a625bb10aa9f8394efd6575115c1dca19a.webm";
+
 export interface QuestTaskInfo {
     name: SupportedTask | undefined;
     target: number;
@@ -69,6 +71,7 @@ export interface AppSpoofers {
     restoreGame: (() => void) | null;
     setupStream: (() => void) | null;
     restoreStream: (() => void) | null;
+    cancelActiveTask: (() => void) | null;
 }
 
 export interface AppState {

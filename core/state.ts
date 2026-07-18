@@ -31,7 +31,7 @@ export const AppState: AppStateType = {
             if (this.promise) await this.promise;
         }
     },
-    spoofers: { setupGame: null, restoreGame: null, setupStream: null, restoreStream: null },
+    spoofers: { setupGame: null, restoreGame: null, setupStream: null, restoreStream: null, cancelActiveTask: null },
     nextHeartbeatTime: null
 };
 
