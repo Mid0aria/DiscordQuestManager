@@ -23,6 +23,8 @@ const POSITION_STORAGE_KEY = "QuestManager_overlayPosition";
 
 interface OverlayPosition { x: number; y: number; }
 
+const SNAP_THRESHOLD = 24;
+
 function clampPosition(pos: OverlayPosition, el: HTMLElement): OverlayPosition {
     const rect = el.getBoundingClientRect();
     const maxX = Math.max(0, window.innerWidth - rect.width);
@@ -33,10 +35,40 @@ function clampPosition(pos: OverlayPosition, el: HTMLElement): OverlayPosition {
     };
 }
 
+/** Snaps a clamped position to the nearest screen edge once it's within SNAP_THRESHOLD of it. */
+function snapToEdges(pos: OverlayPosition, el: HTMLElement): OverlayPosition {
+    const rect = el.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth - rect.width);
+    const maxY = Math.max(0, window.innerHeight - rect.height);
+
+    let { x, y } = pos;
+    if (x <= SNAP_THRESHOLD) x = 0;
+    else if (maxX - x <= SNAP_THRESHOLD) x = maxX;
+
+    if (y <= SNAP_THRESHOLD) y = 0;
+    else if (maxY - y <= SNAP_THRESHOLD) y = maxY;
+
+    return { x, y };
+}
+
+function GripIcon() {
+    return (
+        <svg className="vc-quest-overlay-grip" width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.4" />
+            <circle cx="8" cy="2" r="1.4" />
+            <circle cx="2" cy="7" r="1.4" />
+            <circle cx="8" cy="7" r="1.4" />
+            <circle cx="2" cy="12" r="1.4" />
+            <circle cx="8" cy="12" r="1.4" />
+        </svg>
+    );
+}
+
 export function QuestOverlay() {
     const [minimized, setMinimized] = useState(false);
     const [now, setNow] = useState(Date.now());
     const [position, setPosition] = useState<OverlayPosition | null>(null);
+    const [isDragging, setIsDragging] = useState(false);
     const rootRef = useRef<HTMLDivElement | null>(null);
     const draggingRef = useRef(false);
     const dragOffsetRef = useRef({ x: 0, y: 0 });
@@ -66,9 +98,12 @@ export function QuestOverlay() {
         const onMouseUp = () => {
             if (!draggingRef.current) return;
             draggingRef.current = false;
+            setIsDragging(false);
             setPosition(pos => {
-                if (pos) DataStore.set(POSITION_STORAGE_KEY, pos).catch(() => { /* ignore persist failures */ });
-                return pos;
+                if (!pos || !rootRef.current) return pos;
+                const snapped = snapToEdges(pos, rootRef.current);
+                DataStore.set(POSITION_STORAGE_KEY, snapped).catch(() => { /* ignore persist failures */ });
+                return snapped;
             });
         };
         window.addEventListener("mousemove", onMouseMove);
@@ -99,7 +134,13 @@ export function QuestOverlay() {
         const rect = rootRef.current.getBoundingClientRect();
         dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
         draggingRef.current = true;
+        setIsDragging(true);
         e.preventDefault();
+    };
+
+    const resetPosition = () => {
+        setPosition(null);
+        DataStore.del(POSITION_STORAGE_KEY).catch(() => { /* ignore persist failures */ });
     };
 
     const positionStyle: React.CSSProperties = position
@@ -107,9 +148,14 @@ export function QuestOverlay() {
         : {};
 
     return (
-        <div className="vc-quest-overlay" ref={rootRef} style={positionStyle}>
-            <div className="vc-quest-overlay-header" onMouseDown={onHeaderMouseDown} style={{ cursor: "grab" }}>
+        <div
+            className={`vc-quest-overlay${isDragging ? " vc-quest-overlay-dragging" : ""}`}
+            ref={rootRef}
+            style={positionStyle}
+        >
+            <div className="vc-quest-overlay-header" onMouseDown={onHeaderMouseDown}>
                 <div className="vc-quest-overlay-title">
+                    <GripIcon />
                     <StatusIcon status={workerStatus} />
                     Quest Manager
                     {AppState.nextHeartbeatTime && AppState.nextHeartbeatTime > now && workerStatus === "running" && (
@@ -118,13 +164,24 @@ export function QuestOverlay() {
                         </span>
                     )}
                 </div>
-                <button
-                    onClick={() => setMinimized(m => !m)}
-                    style={{ background: "transparent", border: "none", color: "var(--text-muted, #949ba4)", cursor: "pointer", fontSize: "12px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                    title={minimized ? "Expand" : "Minimize"}
-                >
-                    {minimized ? "➕" : "➖"}
-                </button>
+                <div className="vc-quest-overlay-header-btns">
+                    {position && (
+                        <button
+                            className="vc-quest-overlay-header-btn"
+                            onClick={resetPosition}
+                            title="Reset position"
+                        >
+                            ⟲
+                        </button>
+                    )}
+                    <button
+                        className="vc-quest-overlay-header-btn"
+                        onClick={() => setMinimized(m => !m)}
+                        title={minimized ? "Expand" : "Minimize"}
+                    >
+                        {minimized ? "➕" : "➖"}
+                    </button>
+                </div>
             </div>
 
             {!minimized && (

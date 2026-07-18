@@ -436,7 +436,7 @@
     pointer-events: auto;
     z-index: 2147483647;
     width: 260px;
-    background: rgba(17, 18, 20, 0.95);
+    background: var(--background-secondary, #111214);
     backdrop-filter: blur(8px);
     border: 1px solid var(--background-modifier-accent);
     border-radius: 12px;
@@ -445,7 +445,14 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
     animation: vc-quest-slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vc-quest-overlay:hover,
+.vc-quest-overlay.vc-quest-overlay-dragging {
+    opacity: 1;
 }
 
 @keyframes vc-quest-slide-up {
@@ -464,6 +471,17 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    cursor: grab;
+}
+
+.vc-quest-overlay-header:active {
+    cursor: grabbing;
+}
+
+.vc-quest-overlay-grip {
+    color: var(--text-muted, #949ba4);
+    opacity: 0.7;
+    flex-shrink: 0;
 }
 
 .vc-quest-overlay-title {
@@ -474,6 +492,31 @@
     align-items: center;
     gap: 6px;
     text-transform: uppercase;
+}
+
+.vc-quest-overlay-header-btns {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.vc-quest-overlay-header-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted, #949ba4);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border-radius: 4px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.vc-quest-overlay-header-btn:hover {
+    color: var(--text-normal, #dbdee1);
+    background: var(--background-modifier-hover);
 }
 
 .vc-quest-overlay-body {

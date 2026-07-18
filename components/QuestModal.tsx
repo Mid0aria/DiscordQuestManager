@@ -543,7 +543,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                 style={{
                                                     fontSize: "36px",
                                                     fontWeight: 800,
-                                                    color: "#ffffff",
+                                                    color: "var(--header-primary, #ffffff)",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     gap: "12px",
@@ -578,7 +578,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                             <span
                                                 style={{
                                                     fontSize: "14px",
-                                                    color: "#b5bac1",
+                                                    color: "var(--text-muted, #b5bac1)",
                                                     textTransform: "uppercase",
                                                     fontWeight: 600,
                                                     letterSpacing: "0.5px",
@@ -590,7 +590,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                 style={{
                                                     fontSize: "36px",
                                                     fontWeight: 800,
-                                                    color: "#ffffff",
+                                                    color: "var(--header-primary, #ffffff)",
                                                     display: "flex",
                                                     alignItems: "center",
                                                     gap: "12px",
