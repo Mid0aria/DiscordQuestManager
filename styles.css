@@ -336,6 +336,41 @@
     letter-spacing: 0.5px;
 }
 
+.vc-quest-item-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.vc-quest-item-control-btn {
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--background-tertiary);
+    color: var(--text-muted, #949ba4);
+    border: none;
+    border-radius: 6px;
+    font-size: 10px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.vc-quest-item-control-btn:hover:not(:disabled) {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal, #dbdee1);
+}
+
+.vc-quest-item-control-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.vc-quest-item-control-btn.vc-quest-item-remove:hover:not(:disabled) {
+    background: var(--status-danger, #da373c);
+    color: #fff;
+}
+
 .vc-quest-empty-state {
     flex: 1;
     display: flex;
@@ -399,6 +434,7 @@
 
 .vc-quest-overlay {
     pointer-events: auto;
+    z-index: 2147483647;
     width: 260px;
     background: rgba(17, 18, 20, 0.95);
     backdrop-filter: blur(8px);

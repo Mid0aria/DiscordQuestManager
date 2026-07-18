@@ -16,6 +16,7 @@ import { checkForUpdatesAndNotify } from "./api/updater";
 import { QuestHeaderButton } from "./components/QuestButton";
 import { openQuestManagerModal } from "./components/QuestModal";
 import { mountOverlay, unmountOverlay } from "./components/QuestOverlay";
+import { startExpiryWatcher, stopExpiryWatcher } from "./core/expiryWatcher";
 import { AppState, log, setRunning } from "./core/state";
 import { initQueue, stopAndCleanup } from "./core/worker";
 import { settings } from "./settings";
@@ -88,6 +89,7 @@ export default definePlugin({
         log("QuestCompleter started successfully. 🚀", "success", true);
 
         mountOverlay();
+        startExpiryWatcher();
     },
 
     isRunning: false,
@@ -96,6 +98,7 @@ export default definePlugin({
         this.isRunning = false;
         stopAndCleanup();
         unmountOverlay();
+        stopExpiryWatcher();
         log("Plugin stopped.", "warn", true);
 
         AppState.activeWorker = false;

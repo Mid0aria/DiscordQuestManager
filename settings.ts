@@ -99,5 +99,17 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Automatically check for QuestManager updates (git pull) shortly after Discord starts.",
         default: true
+    },
+    enableExpiryWarnings: {
+        type: OptionType.BOOLEAN,
+        description: "Warn when an in-progress quest is about to expire.",
+        default: true
+    },
+    expiryWarningHours: {
+        type: OptionType.SLIDER,
+        description: "How many hours before expiration to send the warning.",
+        default: 24,
+        markers: [1, 6, 12, 24, 48],
+        stickToMarkers: false
     }
 });

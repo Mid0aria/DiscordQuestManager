@@ -82,3 +82,15 @@ export async function addQuestToHistory(questId: string, questName: string, rewa
         req.onerror = () => reject(req.error);
     });
 }
+
+export async function clearUserHistory(): Promise<void> {
+    const userId = UserStore?.getCurrentUser()?.id || "unknown";
+    const db = await getDB();
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(userId);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}

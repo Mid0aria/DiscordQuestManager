@@ -34,6 +34,7 @@ export async function runWorker(): Promise<void> {
 
         const quest = AppState.queue.shift()!;
         AppState.currentQuest = quest;
+        AppState.skipRequested = false;
 
         try {
             const taskInfo = getTaskInfo(quest);
@@ -45,7 +46,8 @@ export async function runWorker(): Promise<void> {
                 else if (taskInfo.name === "STREAM_ON_DESKTOP") await streamDesktop(quest, taskInfo);
                 else if (taskInfo.name === "PLAY_ACTIVITY") await playActivity(quest, taskInfo);
 
-                if (isRunning) {
+                // skipCurrentQuest() already logged the skip; nothing left to do for this quest.
+                if (isRunning && !AppState.skipRequested) {
                     log(`Congratulations! ${quest.config.messages.questName} completed! 🎉`, "success", true);
                     if (settings.store.autoClaimRewards) {
                         await claimQuestReward(quest);
@@ -66,6 +68,7 @@ export async function runWorker(): Promise<void> {
         }
 
         AppState.currentQuest = null;
+        AppState.skipRequested = false;
     }
 
     AppState.activeWorker = false;
@@ -90,6 +93,13 @@ export function resumeWorker() {
     log("Quest process resuming... ▶️", "success", true);
 }
 
+export function skipCurrentQuest() {
+    if (!AppState.currentQuest) return;
+    AppState.skipRequested = true;
+    if (AppState.spoofers.cancelActiveTask) AppState.spoofers.cancelActiveTask();
+    log(`Skipped: ${AppState.currentQuest.config.messages.questName}`, "warn", true);
+}
+
 export async function enrollQuest(quest: Quest): Promise<boolean> {
     const ok = await enroll(quest);
     if (ok && !AppState.queue.some(xq => xq.id === quest.id)) {
@@ -110,6 +120,22 @@ export async function enrollAll(): Promise<void> {
     for (const q of unenrolled) {
         await enrollQuest(q);
     }
+}
+
+export function removeFromQueue(questId: string): void {
+    AppState.queue = AppState.queue.filter(q => q.id !== questId);
+}
+
+export function moveQueueItem(questId: string, direction: "up" | "down"): void {
+    const idx = AppState.queue.findIndex(q => q.id === questId);
+    if (idx === -1) return;
+
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= AppState.queue.length) return;
+
+    const newQueue = [...AppState.queue];
+    [newQueue[idx], newQueue[swapIdx]] = [newQueue[swapIdx], newQueue[idx]];
+    AppState.queue = newQueue;
 }
 
 export function initQueue(autoRun: boolean = false): void {

@@ -6,6 +6,7 @@
 
 import { FluxDispatcher, RestAPI } from "@webpack/common";
 
+import { withRetry } from "../core/http";
 import { AppState, isRunning, log, sleep } from "../core/state";
 import { ChannelStore, GuildChannelStore, RunningGameStore, StreamingStore } from "../core/stores";
 import { settings } from "../settings";
@@ -17,7 +18,7 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
     let current = taskInfo.progress;
     log(`Started video task: ${quest.config.messages.questName}`, "info", true);
 
-    while (current < taskInfo.target && isRunning) {
+    while (current < taskInfo.target && isRunning && !AppState.skipRequested) {
         await AppState.pauseManager.waitIfPaused();
 
         const speed = randomize ? baseSpeed * (0.8 + Math.random() * 0.4) : baseSpeed;
@@ -26,22 +27,23 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
         AppState.nextHeartbeatTime = Date.now() + (add * 1000);
         await sleep(add * 1000);
         await AppState.pauseManager.waitIfPaused();
+        if (AppState.skipRequested) break;
 
         current = Math.min(taskInfo.target, current + add);
-        const res = await RestAPI.post({
+        const res = await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/video-progress`,
             body: { timestamp: current + Math.random() }
-        });
+        }));
 
         if ((res.body as any).completed_at) break;
     }
 
-    if (isRunning) {
+    if (isRunning && !AppState.skipRequested) {
         AppState.nextHeartbeatTime = null;
-        await RestAPI.post({
+        await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/video-progress`,
             body: { timestamp: taskInfo.target }
-        });
+        }));
     }
 }
 
@@ -101,7 +103,7 @@ export async function spoofDispatcherEvent(
 
 export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
     const appId = quest.config.application.id;
-    const res = await RestAPI.get({ url: `/applications/public?application_ids=${appId}` });
+    const res = await withRetry(() => RestAPI.get({ url: `/applications/public?application_ids=${appId}` }));
     const appData = (res.body as any[])[0];
     const platform = (window as any).DiscordNative?.process?.platform ?? "win32";
     const exeName = appData.executables?.find((x: any) => x.os === platform)?.name?.replace(">", "")
@@ -181,12 +183,14 @@ export async function playActivity(quest: Quest, taskInfo: QuestTaskInfo): Promi
 
     log(`Started activity task: ${quest.config.messages.questName}`, "info", true);
 
-    while (current < taskInfo.target && isRunning) {
+    while (current < taskInfo.target && isRunning && !AppState.skipRequested) {
         await AppState.pauseManager.waitIfPaused();
-        const res = await RestAPI.post({
+        if (AppState.skipRequested) break;
+
+        const res = await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/heartbeat`,
             body: { stream_key: streamKey, terminal: false }
-        });
+        }));
         current = (res.body as any).progress.PLAY_ACTIVITY.value;
 
         const baseInterval = settings.store.activityInterval;
@@ -198,11 +202,11 @@ export async function playActivity(quest: Quest, taskInfo: QuestTaskInfo): Promi
         await AppState.pauseManager.waitIfPaused();
     }
 
-    if (isRunning) {
+    if (isRunning && !AppState.skipRequested) {
         AppState.nextHeartbeatTime = null;
-        await RestAPI.post({
+        await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/heartbeat`,
             body: { stream_key: streamKey, terminal: true }
-        });
+        }));
     }
 }

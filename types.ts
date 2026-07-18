@@ -81,4 +81,5 @@ export interface AppState {
     pauseManager: PauseManager;
     spoofers: AppSpoofers;
     nextHeartbeatTime: number | null;
+    skipRequested: boolean;
 }

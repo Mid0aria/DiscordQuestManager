@@ -7,6 +7,7 @@
 import { NavigationRouter, RestAPI } from "@webpack/common";
 
 import { addQuestToHistory } from "../core/db";
+import { withRetry } from "../core/http";
 import { log, sleep } from "../core/state";
 import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
@@ -42,11 +43,14 @@ export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
     }
 
     if (!orbs) {
-        const orbMatch = name.match(/(\d+)\s*orb/i);
-        if (orbMatch) {
-            orbs = parseInt(orbMatch[1], 10);
-        } else if (quest.userStatus && (quest.userStatus as any).orbQuantityClaimed) {
+        // Prefer the structured claimed-quantity field over the regex fallback below,
+        // since that regex only matches English reward text and silently returns 0
+        // orbs on non-English Discord locales.
+        if (quest.userStatus && (quest.userStatus as any).orbQuantityClaimed) {
             orbs = (quest.userStatus as any).orbQuantityClaimed;
+        } else {
+            const orbMatch = name.match(/(\d+)\s*orb/i);
+            if (orbMatch) orbs = parseInt(orbMatch[1], 10);
         }
     }
 
@@ -116,20 +120,21 @@ export function getAllQuests(): Quest[] {
 export async function enroll(quest: Quest): Promise<boolean> {
     if (quest.userStatus?.enrolledAt) return true;
     try {
-        await RestAPI.post({
+        await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/enroll`,
             body: {
                 location: 11,
                 is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
                 traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
             }
-        });
+        }));
         log(`Enrolled: ${quest.config.messages.questName}`, "success", true);
         quest.userStatus = quest.userStatus || {};
         quest.userStatus.enrolledAt = new Date().toISOString();
         await sleep(1500);
         return true;
-    } catch {
+    } catch (e) {
+        console.error("[QuestManager]", e);
         log(`Enrollment failed: ${quest.config.messages.questName}`, "error", true);
         return false;
     }
@@ -140,7 +145,7 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
         if (QuestActions && typeof QuestActions.claimQuestReward === "function") {
             await QuestActions.claimQuestReward(quest.id, 11);
         } else {
-            await RestAPI.post({
+            await withRetry(() => RestAPI.post({
                 url: `/quests/${quest.id}/claim-reward`,
                 body: {
                     platform: 0,
@@ -149,7 +154,7 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
                     metadata_sealed: null,
                     traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
                 }
-            });
+            }));
             if (quest.userStatus) quest.userStatus.claimedAt = new Date().toISOString();
         }
 
@@ -159,6 +164,7 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
         log(`Claim triggered: ${quest.config.messages.questName}`, "success", true);
         return true;
     } catch (e) {
+        console.error("[QuestManager]", e);
         log("Failed to claim reward. Redirecting for manual claim...", "warn", true);
         try {
             NavigationRouter.transitionTo("/quest-home");

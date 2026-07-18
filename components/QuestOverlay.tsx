@@ -4,26 +4,79 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { createRoot, React, useEffect, useState } from "@webpack/common";
+import * as DataStore from "@api/DataStore";
+import ErrorBoundary from "@components/ErrorBoundary";
+import { createRoot, React, useEffect, useRef, useState } from "@webpack/common";
 
 import { getTaskInfo } from "../api/questApi";
 import { AppState, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
-import { pauseWorker, resumeWorker, runWorker } from "../core/worker";
+import { pauseWorker, resumeWorker, runWorker, skipCurrentQuest } from "../core/worker";
 import { settings } from "../settings";
 import { Quest } from "../types";
 import { ProgressBar } from "./ProgressBar";
 import { StatusIcon } from "./StatusIcon";
 
+// Discord's renderer does not expose `window.localStorage`, so overlay position
+// is persisted through Vencord's IndexedDB-backed DataStore instead.
+const POSITION_STORAGE_KEY = "QuestManager_overlayPosition";
+
+interface OverlayPosition { x: number; y: number; }
+
+function clampPosition(pos: OverlayPosition, el: HTMLElement): OverlayPosition {
+    const rect = el.getBoundingClientRect();
+    const maxX = Math.max(0, window.innerWidth - rect.width);
+    const maxY = Math.max(0, window.innerHeight - rect.height);
+    return {
+        x: Math.min(Math.max(0, pos.x), maxX),
+        y: Math.min(Math.max(0, pos.y), maxY)
+    };
+}
+
 export function QuestOverlay() {
     const [minimized, setMinimized] = useState(false);
     const [now, setNow] = useState(Date.now());
+    const [position, setPosition] = useState<OverlayPosition | null>(null);
+    const rootRef = useRef<HTMLDivElement | null>(null);
+    const draggingRef = useRef(false);
+    const dragOffsetRef = useRef({ x: 0, y: 0 });
 
     useEffect(() => {
         const id = setInterval(() => {
             setNow(Date.now());
         }, 1000);
         return () => clearInterval(id);
+    }, []);
+
+    useEffect(() => {
+        DataStore.get<OverlayPosition>(POSITION_STORAGE_KEY)
+            .then(saved => {
+                if (saved && rootRef.current) setPosition(clampPosition(saved, rootRef.current));
+                else if (saved) setPosition(saved);
+            })
+            .catch(() => { /* storage unavailable, fall back to the default corner */ });
+    }, []);
+
+    useEffect(() => {
+        const onMouseMove = (e: MouseEvent) => {
+            if (!draggingRef.current || !rootRef.current) return;
+            const next = { x: e.clientX - dragOffsetRef.current.x, y: e.clientY - dragOffsetRef.current.y };
+            setPosition(clampPosition(next, rootRef.current));
+        };
+        const onMouseUp = () => {
+            if (!draggingRef.current) return;
+            draggingRef.current = false;
+            setPosition(pos => {
+                if (pos) DataStore.set(POSITION_STORAGE_KEY, pos).catch(() => { /* ignore persist failures */ });
+                return pos;
+            });
+        };
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp);
+        return () => {
+            window.removeEventListener("mousemove", onMouseMove);
+            window.removeEventListener("mouseup", onMouseUp);
+        };
     }, []);
 
     if (!settings.store.showOverlay) return null;
@@ -41,9 +94,21 @@ export function QuestOverlay() {
                 : activeWorker ? "running"
                     : "idle";
 
+    const onHeaderMouseDown = (e: React.MouseEvent) => {
+        if ((e.target as HTMLElement).closest("button") || !rootRef.current) return;
+        const rect = rootRef.current.getBoundingClientRect();
+        dragOffsetRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        draggingRef.current = true;
+        e.preventDefault();
+    };
+
+    const positionStyle: React.CSSProperties = position
+        ? { position: "fixed", left: position.x, top: position.y, right: "auto", bottom: "auto" }
+        : {};
+
     return (
-        <div className="vc-quest-overlay">
-            <div className="vc-quest-overlay-header">
+        <div className="vc-quest-overlay" ref={rootRef} style={positionStyle}>
+            <div className="vc-quest-overlay-header" onMouseDown={onHeaderMouseDown} style={{ cursor: "grab" }}>
                 <div className="vc-quest-overlay-title">
                     <StatusIcon status={workerStatus} />
                     Quest Manager
@@ -91,6 +156,11 @@ export function QuestOverlay() {
                                 ▶ Start
                             </button>
                         )}
+                        {activeWorker && currentQuest && (
+                            <button className="vc-quest-overlay-btn" onClick={() => skipCurrentQuest()}>
+                                ⏭ Skip
+                            </button>
+                        )}
                     </div>
                 </>
             )}
@@ -108,7 +178,7 @@ export function mountOverlay() {
     appMount.appendChild(container);
 
     const root = createRoot(container);
-    root.render(<QuestOverlay />);
+    root.render(<ErrorBoundary noop={true}><QuestOverlay /></ErrorBoundary>);
     (container as any)._root = root;
 }
 

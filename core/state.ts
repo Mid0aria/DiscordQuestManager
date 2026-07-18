@@ -32,7 +32,8 @@ export const AppState: AppStateType = {
         }
     },
     spoofers: { setupGame: null, restoreGame: null, setupStream: null, restoreStream: null, cancelActiveTask: null },
-    nextHeartbeatTime: null
+    nextHeartbeatTime: null,
+    skipRequested: false
 };
 
 export let isRunning = false;
