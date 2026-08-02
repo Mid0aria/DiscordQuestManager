@@ -22,17 +22,22 @@ export interface QuestTaskInfo {
     progress: number;
 }
 
+export interface QuestTaskConfigEntry {
+    target: number;
+    applications?: { id: string; }[];
+}
+
 export interface QuestConfig {
     expiresAt: string;
-    application: {
+    application?: {
         id: string;
         name?: string;
     };
     messages: {
         questName: string;
     };
-    taskConfig?: { tasks: Record<string, { target: number; } | null>; };
-    taskConfigV2?: { tasks: Record<string, { target: number; } | null>; };
+    taskConfig?: { tasks: Record<string, QuestTaskConfigEntry | null>; };
+    taskConfigV2?: { tasks: Record<string, QuestTaskConfigEntry | null>; };
     configVersion?: number;
     rewards?: { messages?: { name: string, nameWithArticle?: string; }; orbQuantity?: number; }[];
 }

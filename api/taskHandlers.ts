@@ -6,6 +6,7 @@
 
 import { FluxDispatcher, RestAPI } from "@webpack/common";
 
+import { getTaskApplicationId } from "./questApi";
 import { withRetry } from "../core/http";
 import { AppState, isRunning, log, sleep } from "../core/state";
 import { ChannelStore, GuildChannelStore, RunningGameStore, StreamingStore } from "../core/stores";
@@ -102,7 +103,11 @@ export async function spoofDispatcherEvent(
 }
 
 export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
-    const appId = quest.config.application.id;
+    const appId = getTaskApplicationId(quest, taskInfo.name!);
+    if (!appId) {
+        log(`Could not determine application ID for: ${quest.config.messages.questName}`, "error", true);
+        throw new Error("Missing application ID.");
+    }
     const res = await withRetry(() => RestAPI.get({ url: `/applications/public?application_ids=${appId}` }));
     const appData = (res.body as any[])[0];
     const platform = (window as any).DiscordNative?.process?.platform ?? "win32";
@@ -154,12 +159,17 @@ export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promis
 }
 
 export async function streamDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
+    const appId = getTaskApplicationId(quest, taskInfo.name!);
+    if (!appId) {
+        log(`Could not determine application ID for: ${quest.config.messages.questName}`, "error", true);
+        throw new Error("Missing application ID.");
+    }
     const originalFunc = StreamingStore.getStreamerActiveStreamMetadata;
 
     return spoofDispatcherEvent(quest, taskInfo, () => {
         const setupStream = () => {
             StreamingStore.getStreamerActiveStreamMetadata = () => ({
-                id: quest.config.application.id,
+                id: appId,
                 pid: 1337,
                 sourceName: null
             });

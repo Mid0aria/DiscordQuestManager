@@ -11,7 +11,7 @@ import { withRetry } from "../core/http";
 import { log, sleep } from "../core/state";
 import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
-import { Quest, QuestTaskInfo, SUPPORTED_TASKS } from "../types";
+import { Quest, QuestTaskInfo, SUPPORTED_TASKS, SupportedTask } from "../types";
 
 export function getTaskInfo(quest: Quest): QuestTaskInfo {
     const config = quest.config.taskConfig ?? quest.config.taskConfigV2;
@@ -21,6 +21,11 @@ export function getTaskInfo(quest: Quest): QuestTaskInfo {
         target: (taskName && config?.tasks?.[taskName]?.target) || 0,
         progress: (taskName && quest.userStatus?.progress?.[taskName]?.value) || 0
     };
+}
+
+export function getTaskApplicationId(quest: Quest, taskName: SupportedTask): string | undefined {
+    const config = quest.config.taskConfig ?? quest.config.taskConfigV2;
+    return config?.tasks?.[taskName]?.applications?.[0]?.id ?? quest.config.application?.id;
 }
 
 export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
