@@ -22,7 +22,20 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
     while (current < taskInfo.target && isRunning && !AppState.skipRequested) {
         await AppState.pauseManager.waitIfPaused();
 
-        const speed = randomize ? baseSpeed * (0.8 + Math.random() * 0.4) : baseSpeed;
+        let speed = baseSpeed;
+        if (randomize) {
+            // 8% chance to simulate a short 1-2.5s buffering/human pause
+            if (Math.random() < 0.08) {
+                const bufferWait = 1000 + Math.random() * 1500;
+                await sleep(bufferWait);
+                await AppState.pauseManager.waitIfPaused();
+                if (AppState.skipRequested) break;
+            }
+            // Dynamic jitter with realistic smooth variation (0.75x to 1.25x)
+            const jitterFactor = 0.75 + Math.random() * 0.50;
+            speed = Math.max(1, baseSpeed * jitterFactor);
+        }
+
         const add = Math.min(speed, taskInfo.target - current);
 
         AppState.nextHeartbeatTime = Date.now() + (add * 1000);
@@ -33,7 +46,7 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
         current = Math.min(taskInfo.target, current + add);
         const res = await withRetry(() => RestAPI.post({
             url: `/quests/${quest.id}/video-progress`,
-            body: { timestamp: current + Math.random() }
+            body: { timestamp: current + (randomize ? Math.random() * 0.5 : 0) }
         }));
 
         if ((res.body as any).completed_at) break;
@@ -205,7 +218,7 @@ export async function playActivity(quest: Quest, taskInfo: QuestTaskInfo): Promi
 
         const baseInterval = settings.store.activityInterval;
         const randomize = settings.store.randomizeProgress;
-        const interval = randomize ? baseInterval * (0.8 + Math.random() * 0.4) : baseInterval;
+        const interval = randomize ? baseInterval * (0.85 + Math.random() * 0.3) : baseInterval;
 
         AppState.nextHeartbeatTime = Date.now() + (interval * 1000);
         await sleep(interval * 1000);

@@ -67,6 +67,21 @@ export const settings = definePluginSettings({
         description: "Automatically pause quest processing when you join a voice channel.",
         default: false
     },
+    pauseOnGameConflict: {
+        type: OptionType.BOOLEAN,
+        description: "Pause quests when you are playing a real game or streaming to prevent conflicts.",
+        default: true
+    },
+    runOnlyWhenIdle: {
+        type: OptionType.BOOLEAN,
+        description: "Only process quests when Discord is idle / AFK.",
+        default: false
+    },
+    autoRequeueFailed: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically move failed quests to the end of the queue for retry.",
+        default: true
+    },
     delayBetweenQuests: {
         type: OptionType.SLIDER,
         description: "Delay (in seconds) between finishing one quest and starting the next.",
@@ -76,7 +91,7 @@ export const settings = definePluginSettings({
     },
     randomizeProgress: {
         type: OptionType.BOOLEAN,
-        description: "Randomize heartbeat progress intervals slightly to appear more human.",
+        description: "Randomize heartbeat progress intervals and video speed slightly to appear more human.",
         default: true
     },
     logLevel: {
@@ -94,6 +109,22 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show a widget in the bottom right corner with the active quest status.",
         default: true
+    },
+    overlayStyle: {
+        type: OptionType.SELECT,
+        description: "Visual appearance style for the floating overlay.",
+        default: "standard",
+        options: [
+            { label: "Standard Box", value: "standard" },
+            { label: "Compact Mini-Pill", value: "pill" }
+        ]
+    },
+    overlayOpacity: {
+        type: OptionType.SLIDER,
+        description: "Base opacity percentage for the floating overlay.",
+        default: 85,
+        markers: [40, 60, 75, 85, 100],
+        stickToMarkers: false
     },
     autoCheckUpdates: {
         type: OptionType.BOOLEAN,

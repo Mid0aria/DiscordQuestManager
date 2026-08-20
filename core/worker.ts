@@ -11,7 +11,28 @@ import { playActivity, playDesktop, streamDesktop, watchVideo } from "../api/tas
 import { settings } from "../settings";
 import { Quest } from "../types";
 import { AppState, isRunning, log, setRunning } from "./state";
-import { QuestsStore } from "./stores";
+import { IdleStore, QuestsStore, RunningGameStore, StreamingStore } from "./stores";
+
+function hasGameOrStreamConflict(): boolean {
+    if (!settings.store.pauseOnGameConflict) return false;
+
+    const realGames = RunningGameStore?.getRunningGames?.() || [];
+    const hasRealGame = realGames.some((g: any) => g.pid !== 1337 && g.id !== AppState.currentQuest?.config?.application?.id);
+    if (hasRealGame) return true;
+
+    const isStreaming = StreamingStore?.getCurrentUserActiveStream?.() != null;
+    if (isStreaming) return true;
+
+    return false;
+}
+
+function isUserActiveWhenIdleOnly(): boolean {
+    if (!settings.store.runOnlyWhenIdle) return false;
+    if (IdleStore && typeof IdleStore.isIdle === "function") {
+        return !IdleStore.isIdle();
+    }
+    return false;
+}
 
 export async function runWorker(): Promise<void> {
     if (AppState.activeWorker) return;
@@ -28,6 +49,22 @@ export async function runWorker(): Promise<void> {
                 }
                 if (isRunning && !AppState.pauseManager.isPaused) log("Voice channel left, resuming quests...", "info", true);
             }
+        }
+
+        if (hasGameOrStreamConflict()) {
+            log("Quest paused because a real game or stream is active...", "warn", true);
+            while (hasGameOrStreamConflict() && isRunning && !AppState.pauseManager.isPaused) {
+                await new Promise(r => setTimeout(r, 5000));
+            }
+            if (isRunning && !AppState.pauseManager.isPaused) log("Game/stream ended, resuming quests...", "info", true);
+        }
+
+        if (isUserActiveWhenIdleOnly()) {
+            log("Quest paused: Waiting for Discord to become idle / AFK...", "info", true);
+            while (isUserActiveWhenIdleOnly() && isRunning && !AppState.pauseManager.isPaused) {
+                await new Promise(r => setTimeout(r, 5000));
+            }
+            if (isRunning && !AppState.pauseManager.isPaused) log("Discord is idle, resuming quests...", "info", true);
         }
 
         if (!isRunning) break;
@@ -56,8 +93,11 @@ export async function runWorker(): Promise<void> {
                     if (AppState.queue.length > 0) {
                         const delay = settings.store.delayBetweenQuests ?? 0;
                         if (delay > 0) {
-                            log(`Waiting ${delay} seconds before starting the next quest...`, "info");
-                            await new Promise(r => setTimeout(r, delay * 1000));
+                            const actualDelay = settings.store.randomizeProgress
+                                ? Math.max(1, Math.round(delay * (0.8 + Math.random() * 0.4)))
+                                : delay;
+                            log(`Waiting ${actualDelay} seconds before starting the next quest...`, "info");
+                            await new Promise(r => setTimeout(r, actualDelay * 1000));
                         }
                     }
                 }
@@ -65,6 +105,16 @@ export async function runWorker(): Promise<void> {
         } catch (e) {
             console.error("[QuestManager]", e);
             log(`Error: ${quest.config?.messages?.questName} failed.`, "error", true);
+
+            if (settings.store.autoRequeueFailed && isRunning) {
+                quest._retryCount = (quest._retryCount || 0) + 1;
+                if (quest._retryCount <= 2) {
+                    log(`Requeueing "${quest.config?.messages?.questName}" to retry later (Attempt ${quest._retryCount}/2)...`, "warn", true);
+                    AppState.queue.push(quest);
+                } else {
+                    log(`Max retries reached for "${quest.config?.messages?.questName}". Skipping.`, "error", true);
+                }
+            }
         }
 
         AppState.currentQuest = null;

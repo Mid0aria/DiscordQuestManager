@@ -6,7 +6,7 @@
 
 import { React } from "@webpack/common";
 
-import { getQuestReward, getTaskInfo } from "../api/questApi";
+import { calculateQuestETA, formatETA, getQuestReward, getTaskInfo } from "../api/questApi";
 import { ORB_ICON_URL, Quest } from "../types";
 
 interface QuestListItemProps {
@@ -22,18 +22,28 @@ interface QuestListItemProps {
 export function QuestListItem({ quest, isActive, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: QuestListItemProps) {
     const info = getTaskInfo(quest);
     const reward = getQuestReward(quest);
+    const etaSec = calculateQuestETA(quest);
     const showControls = onRemove || onMoveUp || onMoveDown;
 
     return (
         <div className={`vc-quest-list-item ${isActive ? "active" : ""}`}>
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <span className="vc-quest-list-item-name">{quest.config.messages.questName}</span>
-                <span style={{ fontSize: "12px", color: "var(--text-muted)", display: "flex", gap: "6px", alignItems: "center" }}>
-                    <video src={ORB_ICON_URL} autoPlay loop muted playsInline width="16" height="16" style={{ pointerEvents: "none" }} />
-                    {reward.orbs > 0 ? `${reward.orbs} Orbs` : reward.name}
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: 0, flex: 1 }}>
+                <span className="vc-quest-list-item-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {quest.config.messages.questName}
                 </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "var(--text-muted)" }}>
+                    <span style={{ display: "flex", gap: "5px", alignItems: "center" }}>
+                        <video src={ORB_ICON_URL} autoPlay loop muted playsInline width="14" height="14" style={{ pointerEvents: "none" }} />
+                        {reward.orbs > 0 ? `${reward.orbs} Orbs` : reward.name}
+                    </span>
+                    {etaSec > 0 && (
+                        <span className="vc-quest-eta-tag">
+                            ⏱️ ~{formatETA(etaSec)}
+                        </span>
+                    )}
+                </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
                 <span className="vc-quest-list-item-type">{info.name ?? "?"}</span>
                 {showControls && (
                     <div className="vc-quest-item-controls">

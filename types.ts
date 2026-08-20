@@ -58,6 +58,7 @@ export interface Quest {
     is_targeted?: boolean;
     trafficMetadata?: any;
     traffic_metadata_sealed?: any;
+    _retryCount?: number;
 }
 
 export type WorkerStatus = "idle" | "running" | "paused" | "stopped";

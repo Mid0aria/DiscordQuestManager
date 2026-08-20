@@ -628,3 +628,387 @@
     color: #ffffff;
     font-weight: 600;
 }
+
+.vc-quest-tab-badge {
+    margin-left: 6px;
+    background: var(--brand-experiment);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.vc-quest-hero-eta-pill {
+    background: rgba(88, 101, 242, 0.2);
+    border: 1px solid rgba(88, 101, 242, 0.4);
+    color: #a1aeff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.vc-quest-eta-tag {
+    color: var(--text-warning, #faa61a);
+    font-weight: 600;
+    font-size: 11px;
+}
+
+/* Search & Filter Toolbar */
+.vc-quest-filter-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vc-quest-search-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--background-secondary, #111214);
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-muted);
+}
+
+.vc-quest-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-normal, #dbdee1);
+    font-size: 13px;
+    width: 100%;
+}
+
+.vc-quest-search-input::placeholder {
+    color: var(--text-muted);
+}
+
+.vc-quest-search-clear {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px;
+}
+
+.vc-quest-search-clear:hover {
+    color: var(--text-normal);
+}
+
+.vc-quest-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.vc-quest-chip {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-accent);
+    color: var(--text-muted);
+    border-radius: 16px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.vc-quest-chip:hover {
+    background: var(--background-modifier-hover);
+    color: var(--text-normal);
+}
+
+.vc-quest-chip.active {
+    background: var(--brand-experiment);
+    border-color: var(--brand-experiment);
+    color: #fff;
+}
+
+/* Mini-Pill Overlay */
+.vc-quest-overlay-pill {
+    width: auto !important;
+    min-width: 240px;
+    padding: 6px 12px !important;
+    border-radius: 24px !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+
+.vc-quest-pill-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--header-primary, #ffffff);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-quest-pill-pct {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--brand-experiment-300, #a1aeff);
+}
+
+.vc-quest-pill-eta {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-warning, #faa61a);
+}
+
+.vc-quest-pill-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.vc-quest-pill-btn {
+    background: var(--background-modifier-accent);
+    border: none;
+    border-radius: 12px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    color: var(--text-normal);
+}
+
+.vc-quest-pill-btn.green {
+    background: #23a559;
+    color: #fff;
+}
+
+.vc-quest-pill-btn.brand {
+    background: var(--brand-experiment);
+    color: #fff;
+}
+
+.vc-quest-overlay-eta {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-warning, #faa61a);
+    margin-right: 4px;
+}
+
+/* Reward Vault Styles */
+.vc-quest-vault-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 24px;
+}
+
+.vc-quest-vault-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.vc-quest-vault-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.vc-quest-vault-card {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.vc-quest-vault-card:hover {
+    border-color: var(--brand-experiment);
+    transform: translateY(-1px);
+}
+
+.vc-quest-vault-card.used {
+    opacity: 0.65;
+}
+
+.vc-quest-vault-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.vc-quest-vault-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--header-primary, #ffffff);
+}
+
+.vc-quest-badge-used {
+    background: var(--background-modifier-accent);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.vc-quest-vault-card-reward {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vc-quest-code-box {
+    margin-top: 4px;
+    background: var(--background-tertiary, #000);
+    border: 1px dashed var(--brand-experiment);
+    border-radius: 6px;
+    padding: 4px 8px;
+    display: inline-flex;
+    font-family: monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #57F287;
+    letter-spacing: 1px;
+    user-select: all;
+}
+
+.vc-quest-vault-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+/* Analytics Stats Grid */
+.vc-quest-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.vc-quest-stat-card {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 10px;
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-align: center;
+}
+
+.vc-quest-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vc-quest-stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--header-primary, #ffffff);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vc-quest-chart-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--header-secondary, #b9bbbe);
+    margin: 0 0 12px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vc-quest-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    height: 100px;
+    gap: 12px;
+    padding-top: 10px;
+}
+
+.vc-quest-chart-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    gap: 6px;
+}
+
+.vc-quest-chart-bar-wrapper {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: var(--background-modifier-accent, rgba(255, 255, 255, 0.04));
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.vc-quest-chart-bar {
+    width: 80%;
+    background: linear-gradient(180deg, #5865F2, #3b428a);
+    border-radius: 4px 4px 0 0;
+    transition: height 0.4s ease;
+}
+
+.vc-quest-chart-bar:hover {
+    background: linear-gradient(180deg, #7983f5, #5865F2);
+}
+
+.vc-quest-chart-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.vc-quest-breakdown-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--background-modifier-accent);
+    margin-bottom: 10px;
+}
+
+.vc-quest-breakdown-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.vc-quest-breakdown-legend .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+}

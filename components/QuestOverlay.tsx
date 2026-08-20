@@ -8,7 +8,7 @@ import * as DataStore from "@api/DataStore";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { createRoot, React, useEffect, useRef, useState } from "@webpack/common";
 
-import { getTaskInfo } from "../api/questApi";
+import { calculateTotalQueueETA, formatETA, getTaskInfo } from "../api/questApi";
 import { AppState, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
 import { pauseWorker, resumeWorker, runWorker, skipCurrentQuest } from "../core/worker";
@@ -129,6 +129,10 @@ export function QuestOverlay() {
                 : activeWorker ? "running"
                     : "idle";
 
+    const totalETA = calculateTotalQueueETA(queue, currentQuest);
+    const isPill = settings.store.overlayStyle === "pill";
+    const baseOpacity = (settings.store.overlayOpacity ?? 85) / 100;
+
     const onHeaderMouseDown = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest("button") || !rootRef.current) return;
         const rect = rootRef.current.getBoundingClientRect();
@@ -143,9 +147,51 @@ export function QuestOverlay() {
         DataStore.del(POSITION_STORAGE_KEY).catch(() => { /* ignore persist failures */ });
     };
 
-    const positionStyle: React.CSSProperties = position
-        ? { position: "fixed", left: position.x, top: position.y, right: "auto", bottom: "auto" }
-        : {};
+    const positionStyle: React.CSSProperties = {
+        opacity: isDragging ? 1 : baseOpacity,
+        ...(position ? { position: "fixed", left: position.x, top: position.y, right: "auto", bottom: "auto" } : {})
+    };
+
+    if (isPill) {
+        const pct = currentInfo && currentInfo.target > 0
+            ? Math.min(100, Math.round((currentInfo.progress / currentInfo.target) * 100))
+            : 0;
+
+        return (
+            <div
+                className={`vc-quest-overlay vc-quest-overlay-pill${isDragging ? " vc-quest-overlay-dragging" : ""}`}
+                ref={rootRef}
+                style={positionStyle}
+                onMouseDown={onHeaderMouseDown}
+            >
+                <GripIcon />
+                <StatusIcon status={workerStatus} />
+                <span className="vc-quest-pill-title">
+                    {currentQuest ? currentQuest.config.messages.questName : "Idle"}
+                </span>
+                {currentQuest && (
+                    <span className="vc-quest-pill-pct">{pct}%</span>
+                )}
+                {totalETA > 0 && (
+                    <span className="vc-quest-pill-eta">~{formatETA(totalETA)}</span>
+                )}
+                <div className="vc-quest-pill-actions">
+                    {activeWorker && !pauseManager.isPaused && (
+                        <button className="vc-quest-pill-btn" onClick={pauseWorker} title="Pause">⏸</button>
+                    )}
+                    {activeWorker && pauseManager.isPaused && (
+                        <button className="vc-quest-pill-btn green" onClick={resumeWorker} title="Resume">▶</button>
+                    )}
+                    {!activeWorker && isRunning && queue.length > 0 && (
+                        <button className="vc-quest-pill-btn brand" onClick={() => runWorker()} title="Start">▶</button>
+                    )}
+                    {activeWorker && currentQuest && (
+                        <button className="vc-quest-pill-btn" onClick={() => skipCurrentQuest()} title="Skip">⏭</button>
+                    )}
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div
@@ -165,6 +211,11 @@ export function QuestOverlay() {
                     )}
                 </div>
                 <div className="vc-quest-overlay-header-btns">
+                    {totalETA > 0 && (
+                        <span className="vc-quest-overlay-eta" title="Total Queue ETA">
+                            ⏱️ ~{formatETA(totalETA)}
+                        </span>
+                    )}
                     {position && (
                         <button
                             className="vc-quest-overlay-header-btn"

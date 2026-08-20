@@ -12,6 +12,9 @@ export interface QuestHistoryEntry {
     date: string;
     rewardName: string;
     orbs: number;
+    code?: string;
+    codeUsed?: boolean;
+    taskType?: string;
 }
 
 export interface UserStats {
@@ -57,12 +60,27 @@ export async function getUserStats(): Promise<UserStats> {
     });
 }
 
-export async function addQuestToHistory(questId: string, questName: string, rewardName: string, orbs: number) {
+export async function addQuestToHistory(
+    questId: string,
+    questName: string,
+    rewardName: string,
+    orbs: number,
+    code?: string,
+    taskType?: string
+) {
     const db = await getDB();
     const stats = await getUserStats();
 
-
-    if (stats.history.find(x => x.id === questId)) return;
+    const existing = stats.history.find(x => x.id === questId);
+    if (existing) {
+        if (code && !existing.code) {
+            existing.code = code;
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            const store = tx.objectStore(STORE_NAME);
+            store.put(stats);
+        }
+        return;
+    }
 
     stats.totalQuests += 1;
     stats.totalOrbs += orbs;
@@ -71,9 +89,28 @@ export async function addQuestToHistory(questId: string, questName: string, rewa
         name: questName,
         date: new Date().toISOString(),
         rewardName,
-        orbs
+        orbs,
+        code,
+        codeUsed: false,
+        taskType
     });
 
+    return new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.put(stats);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+export async function markRewardCodeUsed(questId: string, used: boolean): Promise<void> {
+    const db = await getDB();
+    const stats = await getUserStats();
+    const item = stats.history.find(x => x.id === questId);
+    if (!item) return;
+
+    item.codeUsed = used;
     return new Promise<void>((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readwrite");
         const store = tx.objectStore(STORE_NAME);

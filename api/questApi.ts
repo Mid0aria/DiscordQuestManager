@@ -145,12 +145,46 @@ export async function enroll(quest: Quest): Promise<boolean> {
     }
 }
 
-export async function claimQuestReward(quest: Quest): Promise<boolean> {
+export function calculateQuestETA(quest: Quest): number {
+    const info = getTaskInfo(quest);
+    if (!info.name) return 0;
+    const remaining = Math.max(0, info.target - info.progress);
+    if (info.name.includes("VIDEO")) {
+        const speed = Math.max(1, settings.store.videoSpeed || 7);
+        return Math.ceil(remaining / speed);
+    }
+    return remaining;
+}
+
+export function formatETA(seconds: number): string {
+    if (seconds <= 0) return "0s";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    if (m === 0) return `${s}s`;
+    if (s === 0) return `${m}m`;
+    return `${m}m ${s}s`;
+}
+
+export function calculateTotalQueueETA(queue: Quest[], currentQuest: Quest | null): number {
+    let totalSec = 0;
+    if (currentQuest) {
+        totalSec += calculateQuestETA(currentQuest);
+    }
+    for (const q of queue) {
+        totalSec += calculateQuestETA(q);
+        totalSec += (settings.store.delayBetweenQuests ?? 0);
+    }
+    return totalSec;
+}
+
+export async function claimQuestReward(quest: Quest): Promise<{ success: boolean; code?: string; }> {
     try {
+        let code: string | undefined;
         if (QuestActions && typeof QuestActions.claimQuestReward === "function") {
-            await QuestActions.claimQuestReward(quest.id, 11);
+            const res = await QuestActions.claimQuestReward(quest.id, 11);
+            code = res?.code ?? res?.claim_code ?? res?.redemption_code ?? res?.body?.code;
         } else {
-            await withRetry(() => RestAPI.post({
+            const res = await withRetry(() => RestAPI.post({
                 url: `/quests/${quest.id}/claim-reward`,
                 body: {
                     platform: 0,
@@ -160,20 +194,33 @@ export async function claimQuestReward(quest: Quest): Promise<boolean> {
                     traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
                 }
             }));
+            code = res?.body?.code ?? res?.body?.claim_code ?? res?.body?.redemption_code ?? (quest.userStatus as any)?.claim_code;
             if (quest.userStatus) quest.userStatus.claimedAt = new Date().toISOString();
         }
 
         const reward = getQuestReward(quest);
-        await addQuestToHistory(quest.id, quest.config.messages.questName, reward.name, reward.orbs);
+        const taskInfo = getTaskInfo(quest);
+        await addQuestToHistory(
+            quest.id,
+            quest.config.messages.questName,
+            reward.name,
+            reward.orbs,
+            code,
+            taskInfo.name
+        );
 
-        log(`Claim triggered: ${quest.config.messages.questName}`, "success", true);
-        return true;
+        if (code) {
+            log(`Reward claimed! Promo code saved: ${code} 🎁`, "success", true);
+        } else {
+            log(`Claim triggered: ${quest.config.messages.questName}`, "success", true);
+        }
+        return { success: true, code };
     } catch (e) {
         console.error("[QuestManager]", e);
         log("Failed to claim reward. Redirecting for manual claim...", "warn", true);
         try {
             NavigationRouter.transitionTo("/quest-home");
         } catch { }
-        return false;
+        return { success: false };
     }
 }
