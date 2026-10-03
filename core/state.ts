@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { showToast, Toasts } from "@webpack/common";
+import { showToast } from "@webpack/common";
 
 import { settings } from "../settings";
 import { AppState as AppStateType } from "../types";
@@ -59,12 +59,11 @@ export function log(msg: string, type: "info" | "success" | "warn" | "error" = "
     console.log(`%c[QuestManager]%c ${msg}`, `${styles[type]} font-weight: bold;`, "");
 
     if (showNotification && shouldShow) {
-        const toastTypes = {
-            info: Toasts.Type.MESSAGE,
-            success: Toasts.Type.SUCCESS,
-            error: Toasts.Type.FAILURE,
-            warn: Toasts.Type.MESSAGE
-        };
-        showToast(msg, toastTypes[type]);
+        try {
+            const toastType = type === "success" ? "success" : type === "error" ? "failure" : "message";
+            showToast?.(msg, toastType as any);
+        } catch (e) {
+            console.warn("[QuestManager] showToast failed:", e);
+        }
     }
 }

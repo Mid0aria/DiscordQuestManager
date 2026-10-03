@@ -32,10 +32,13 @@ export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
     let name = "Unknown Reward";
     let orbs = 0;
 
-    const rewards = quest.config?.rewards || (quest.config as any)?.rewardsConfig?.rewards || (quest as any)?.rewards;
+    const rewards = quest.config?.rewards ||
+        (quest.config as any)?.rewardsConfig?.rewards ||
+        (quest as any)?.rewardsConfig?.rewards ||
+        (quest as any)?.rewards;
 
     if (rewards && rewards.length > 0) {
-        name = rewards[0].messages?.name || rewards[0].name || name;
+        name = rewards[0].messages?.nameWithArticle || rewards[0].messages?.name || rewards[0].name || name;
         if (rewards[0].orbQuantity) {
             orbs = rewards[0].orbQuantity;
         }
@@ -43,19 +46,23 @@ export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
         name = (quest.config as any).messages.rewardName;
     }
 
-    if (name === "Unknown Reward") {
-        console.warn("[QuestManager] Could not determine reward for quest:", quest.config?.messages?.questName, quest);
+    if (!orbs) {
+        orbs = (quest.config as any)?.rewardsConfig?.orbQuantity ||
+            (quest.config as any)?.orbQuantity ||
+            (quest.userStatus as any)?.orbQuantityClaimed ||
+            0;
     }
 
     if (!orbs) {
-        // Prefer the structured claimed-quantity field over the regex fallback below,
-        // since that regex only matches English reward text and silently returns 0
-        // orbs on non-English Discord locales.
-        if (quest.userStatus && (quest.userStatus as any).orbQuantityClaimed) {
-            orbs = (quest.userStatus as any).orbQuantityClaimed;
+        const orbMatch = name.match(/(\d+)\s*orb/i);
+        if (orbMatch) orbs = parseInt(orbMatch[1], 10);
+    }
+
+    if (name === "Unknown Reward") {
+        if (orbs > 0) {
+            name = `${orbs} Discord Orbs`;
         } else {
-            const orbMatch = name.match(/(\d+)\s*orb/i);
-            if (orbMatch) orbs = parseInt(orbMatch[1], 10);
+            console.warn("[QuestManager] Could not determine reward for quest:", quest.config?.messages?.questName, quest);
         }
     }
 
@@ -125,14 +132,32 @@ export function getAllQuests(): Quest[] {
 export async function enroll(quest: Quest): Promise<boolean> {
     if (quest.userStatus?.enrolledAt) return true;
     try {
-        await withRetry(() => RestAPI.post({
-            url: `/quests/${quest.id}/enroll`,
-            body: {
-                location: 11,
-                is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
-                traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+        if (QuestActions && typeof QuestActions.enrollInQuest === "function") {
+            try {
+                await QuestActions.enrollInQuest(quest.id, { location: 11, platform: 0 });
+            } catch {
+                await withRetry(() => RestAPI.post({
+                    url: `/quests/${quest.id}/enroll`,
+                    body: {
+                        location: 11,
+                        platform: 0,
+                        is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
+                        traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+                    }
+                }));
             }
-        }));
+        } else {
+            await withRetry(() => RestAPI.post({
+                url: `/quests/${quest.id}/enroll`,
+                body: {
+                    location: 11,
+                    platform: 0,
+                    is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
+                    traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+                }
+            }));
+        }
+
         log(`Enrolled: ${quest.config.messages.questName}`, "success", true);
         quest.userStatus = quest.userStatus || {};
         quest.userStatus.enrolledAt = new Date().toISOString();

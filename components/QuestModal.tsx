@@ -6,7 +6,7 @@
 
 import { ButtonCompat } from "@components/Button";
 import { ModalContent, ModalRoot, ModalSize, openModal } from "@utils/modal";
-import { React, showToast, ThemeStore, Toasts, useEffect, useMemo, useState } from "@webpack/common";
+import { React, showToast, ThemeStore, useEffect, useMemo, useState } from "@webpack/common";
 
 import { calculateTotalQueueETA, claimQuestReward, formatETA, getAllQuests, getQuestReward, getTaskInfo, getUnenrolledQuests } from "../api/questApi";
 import { applyUpdate, checkForUpdates, isOutdated } from "../api/updater";
@@ -123,7 +123,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
         if (!userStats || !userStats.history) return;
         const codes = userStats.history.filter(h => h.code);
         if (codes.length === 0) {
-            showToast("No promo codes found to export.", Toasts.Type.MESSAGE);
+            showToast("No promo codes found to export.", "message");
             return;
         }
 
@@ -145,9 +145,9 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
 
     const copyCode = (code: string) => {
         navigator.clipboard.writeText(code).then(() => {
-            showToast("Code copied to clipboard! 📋", Toasts.Type.SUCCESS);
+            showToast("Code copied to clipboard! 📋", "success");
         }).catch(() => {
-            showToast("Failed to copy code.", Toasts.Type.FAILURE);
+            showToast("Failed to copy code.", "failure");
         });
     };
 
@@ -413,7 +413,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                         if (isOutdated) applyUpdate();
                                         else {
                                             checkForUpdates().then((outdated: boolean) => {
-                                                if (!outdated) showToast("You are on the latest version!", Toasts.Type.SUCCESS);
+                                                if (!outdated) showToast("You are on the latest version!", "success");
                                                 else applyUpdate();
                                             });
                                         }

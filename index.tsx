@@ -47,21 +47,37 @@ export default definePlugin({
         }
     ],
 
-    addIconToToolBar(e: { toolbar: React.ReactNode[] | React.ReactNode; }) {
-        if (Array.isArray(e.toolbar)) {
-            return e.toolbar.unshift(
-                <ErrorBoundary noop={true}>
+    addIconToToolBar(e: { toolbar: any; }) {
+        if (!e) return;
+        try {
+            const btn = (
+                <ErrorBoundary noop={true} key="quest-btn">
                     <QuestHeaderButton />
                 </ErrorBoundary>
             );
-        }
 
-        e.toolbar = [
-            <ErrorBoundary noop={true} key="quest-btn">
-                <QuestHeaderButton />
-            </ErrorBoundary>,
-            e.toolbar,
-        ];
+            if (typeof e.toolbar === "function") {
+                const origToolbar = e.toolbar;
+                e.toolbar = (...args: any[]) => {
+                    const res = origToolbar(...args);
+                    if (Array.isArray(res)) {
+                        if (res.some((item: any) => item?.key === "quest-btn")) return res;
+                        return [btn, ...res];
+                    }
+                    return [btn, res];
+                };
+            } else if (Array.isArray(e.toolbar)) {
+                if (!e.toolbar.some((item: any) => item?.key === "quest-btn")) {
+                    e.toolbar = [btn, ...e.toolbar];
+                }
+            } else if (e.toolbar) {
+                e.toolbar = [btn, e.toolbar];
+            } else {
+                e.toolbar = [btn];
+            }
+        } catch (err) {
+            console.error("[QuestManager] addIconToToolBar error:", err);
+        }
     },
 
     async start() {

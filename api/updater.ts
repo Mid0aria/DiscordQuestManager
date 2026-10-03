@@ -6,7 +6,7 @@
 
 import { showNotification } from "@api/Notifications";
 import { relaunch } from "@utils/native";
-import { showToast, Toasts } from "@webpack/common";
+import { showToast } from "@webpack/common";
 
 import { log } from "../core/state";
 
@@ -45,7 +45,7 @@ export async function applyUpdate() {
     const Native = getNativeBridge() as any;
     if (!Native) return;
 
-    showToast("Downloading QuestManager update...", Toasts.Type.MESSAGE);
+    showToast("Downloading QuestManager update...", "message");
 
     const pullRes = await Native.questManagerUpdate();
     if (!pullRes.ok) {
@@ -55,7 +55,7 @@ export async function applyUpdate() {
 
     const { VencordNative } = (window as any);
     if (VencordNative && VencordNative.updater) {
-        showToast("Rebuilding Vencord...", Toasts.Type.MESSAGE);
+        showToast("Rebuilding Vencord...", "message");
         const buildRes = await VencordNative.updater.rebuild();
         if (!buildRes.ok) {
             log("Build failed. You may need to manually build Vencord.", "error", true);

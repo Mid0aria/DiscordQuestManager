@@ -1,4 +1,53 @@
+/* Header Bar Button */
+.vc-quest-header-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    margin: 0 4px;
+    border-radius: 4px;
+    color: var(--interactive-normal, #b5bac1);
+    transition: color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
+    position: relative;
+    user-select: none;
+    flex-shrink: 0;
+}
 
+.vc-quest-header-btn:hover {
+    color: var(--interactive-hover, #dbdee1);
+    background-color: var(--background-modifier-hover, rgba(78, 80, 88, 0.16));
+}
+
+.vc-quest-header-btn:active {
+    color: var(--interactive-active, #ffffff);
+    background-color: var(--background-modifier-active, rgba(78, 80, 88, 0.24));
+    transform: scale(0.95);
+}
+
+.vc-quest-header-btn-badge {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--status-positive, #23a55a);
+    box-shadow: 0 0 6px var(--status-positive, #23a55a);
+    animation: vc-quest-pulse 2s infinite ease-in-out;
+}
+
+@keyframes vc-quest-pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.3);
+        opacity: 0.7;
+    }
+}
 
 .vc-quest-dashboard {
     display: flex;
@@ -1012,3 +1061,58 @@
     border-radius: 50%;
     margin-right: 4px;
 }
+
+/* --- Discord Quest Home (/quest-home) Native Integration --- */
+.vc-qm-tile-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    height: 38px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    border: none !important;
+    padding: 0 16px !important;
+    background: linear-gradient(135deg, #5865F2, #eb459e) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(88, 101, 242, 0.3) !important;
+    transition: transform 0.15s ease, filter 0.15s ease, opacity 0.15s ease !important;
+}
+
+.vc-qm-tile-btn:hover:not(:disabled) {
+    transform: translateY(-1px) !important;
+    filter: brightness(1.1) !important;
+    box-shadow: 0 4px 14px rgba(88, 101, 242, 0.5) !important;
+}
+
+.vc-qm-tile-btn:active:not(:disabled) {
+    transform: translateY(0) !important;
+}
+
+.vc-qm-tile-btn:disabled {
+    opacity: 0.65 !important;
+    cursor: not-allowed !important;
+}
+
+.vc-qm-tile-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 13px;
+    background: rgba(87, 242, 135, 0.15);
+    color: var(--status-positive, #57F287);
+    border: 1px solid rgba(87, 242, 135, 0.3);
+}
+
+.vc-qm-hero-btn {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+    transition: transform 0.15s ease !important;
+}
+
+.vc-qm-hero-btn:hover {
+    transform: translateY(-1px) !important;
+}
