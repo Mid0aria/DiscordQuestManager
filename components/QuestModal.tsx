@@ -11,15 +11,17 @@ import { React, showToast, ThemeStore, useEffect, useMemo, useState } from "@web
 import { calculateTotalQueueETA, claimQuestReward, formatETA, getAllQuests, getQuestExpiresAt, getQuestName, getQuestReward, getTaskInfo, getUnenrolledQuests } from "../api/questApi";
 import { applyUpdate, checkForUpdates, isOutdated } from "../api/updater";
 import { clearUserHistory, getUserStats, markRewardCodeUsed, UserStats } from "../core/db";
-import { AppState, isRunning } from "../core/state";
+import { AppState, getRemainingRateLimitSec, isCurrentlyRateLimited, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
 import { enrollAll, enrollQuest, initQueue, moveQueueItem, pauseWorker, removeFromQueue, resumeWorker, runWorker, skipCurrentQuest } from "../core/worker";
+import { getVpnScannerState, resetScannerLock, scanRegionsNow } from "../core/vpnScanner";
 import { settings } from "../settings";
 import { ORB_ICON_URL, Quest } from "../types";
 import { getRedeemInfo } from "../utils/redeem";
 import { DebugView } from "./DebugView";
 import { ProgressBar } from "./ProgressBar";
 import { QuestListItem } from "./QuestListItem";
+import { openRegionPickerModal } from "./RegionPickerModal";
 import { StatusIcon } from "./StatusIcon";
 
 interface QuestManagerModalProps {
@@ -33,6 +35,8 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<"all" | "video" | "activity" | "expiring" | "orbs">("all");
     const [vaultFilter, setVaultFilter] = useState<"all" | "unused" | "used">("all");
+    const [vpnScanning, setVpnScanning] = useState(false);
+    const [vpnScanRegion, setVpnScanRegion] = useState<string | null>(null);
 
     useEffect(() => {
         if (AppState.queue.length === 0) {
@@ -40,6 +44,9 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
         }
         const id = setInterval(() => {
             setNow(Date.now());
+            const vpn = getVpnScannerState();
+            setVpnScanning(vpn.isScanning);
+            setVpnScanRegion(vpn.currentRegion);
         }, 1000);
         return () => clearInterval(id);
     }, []);
@@ -80,6 +87,25 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
         setNow(Date.now());
         if (activeTab === "stats" || activeTab === "vault") {
             getUserStats().then(s => setUserStats(s));
+        }
+    };
+
+    const handleVpnScan = async () => {
+        if (vpnScanning) {
+            resetScannerLock();
+            setVpnScanning(false);
+            setVpnScanRegion(null);
+            showToast({ text: "Scan reset / cancelled", variant: "info" });
+            return;
+        }
+        setVpnScanning(true);
+        try {
+            await scanRegionsNow({ manual: true });
+        } finally {
+            refresh();
+            const vpn = getVpnScannerState();
+            setVpnScanning(vpn.isScanning);
+            setVpnScanRegion(vpn.currentRegion);
         }
     };
 
@@ -402,15 +428,16 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                             {/* Action Bar */}
                             <div className="vc-quest-action-bar">
                                 <ButtonCompat
-                                    color={ButtonCompat.Colors.BRAND}
+                                    color={isCurrentlyRateLimited() ? ButtonCompat.Colors.PRIMARY : ButtonCompat.Colors.BRAND}
                                     onClick={() => enrollAll().then(refresh)}
                                     className="vc-quest-btn-glow"
-                                    disabled={unenrolledQuests.length === 0}
+                                    disabled={unenrolledQuests.length === 0 || isCurrentlyRateLimited()}
+                                    title={isCurrentlyRateLimited() ? `Discord enrollment rate limit active. Please wait ~${Math.ceil(getRemainingRateLimitSec() / 60)}m (${getRemainingRateLimitSec()}s).` : undefined}
                                 >
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <path d="M12 5v14M5 12h14" />
                                     </svg>
-                                    Enroll All
+                                    {isCurrentlyRateLimited() ? `Rate Limited (~${Math.ceil(getRemainingRateLimitSec() / 60)}m)` : "Enroll All"}
                                 </ButtonCompat>
                                 <ButtonCompat
                                     color={ButtonCompat.Colors.GREEN}
@@ -432,6 +459,31 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                     </svg>
                                     Refresh
                                 </ButtonCompat>
+                                <ButtonCompat
+                                    color={vpnScanning ? ButtonCompat.Colors.RED : ButtonCompat.Colors.PRIMARY}
+                                    look={ButtonCompat.Looks.LINK}
+                                    onClick={handleVpnScan}
+                                    title={vpnScanning ? (vpnScanRegion ? `Scanning '${vpnScanRegion}' (Click to cancel/reset)` : "Scanning... (Click to cancel/reset)") : (settings.store.enableVpnScanner ? "Scan local connection and configured ExpressVPN regions for quests" : "Scan Discord for newly available quests")}
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "140px" }}>
+                                        {vpnScanning ? (vpnScanRegion ? `Stop: ${vpnScanRegion}` : "Stop Scan") : (settings.store.enableVpnScanner ? "Scan (VPN)" : "Scan Quests")}
+                                    </span>
+                                </ButtonCompat>
+                                {settings.store.enableVpnScanner && (
+                                    <ButtonCompat
+                                        color={ButtonCompat.Colors.PRIMARY}
+                                        look={ButtonCompat.Looks.LINK}
+                                        onClick={openRegionPickerModal}
+                                        title="Select ExpressVPN target countries/regions to scan"
+                                    >
+                                        🗺️ Regions
+                                    </ButtonCompat>
+                                )}
                                 <ButtonCompat
                                     color={ButtonCompat.Colors.PRIMARY}
                                     look={ButtonCompat.Looks.LINK}
@@ -790,14 +842,14 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
 
                                     {/* History Table */}
                                     <div className="vc-quest-panel">
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
                                             <h3 className="vc-quest-panel-title" style={{ margin: 0 }}>
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                     <path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
                                                 </svg>
                                                 Quest History <span className="vc-quest-count">{userStats.history.length}</span>
                                             </h3>
-                                            <div style={{ display: "flex", gap: "8px" }}>
+                                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                                                 <ButtonCompat
                                                     color={ButtonCompat.Colors.PRIMARY}
                                                     look={ButtonCompat.Looks.LINK}

@@ -11,7 +11,7 @@ import { playActivity, playDesktop, streamDesktop, watchVideo } from "../api/tas
 import { settings } from "../settings";
 import { Quest } from "../types";
 import { playQuestCompleteSound } from "../utils/sound";
-import { AppState, isRunning, log, setRunning } from "./state";
+import { AppState, getRemainingRateLimitSec, isCurrentlyRateLimited, isRunning, log, setRunning } from "./state";
 import { IdleStore, QuestsStore, RunningGameStore, StreamingStore } from "./stores";
 
 function hasGameOrStreamConflict(): boolean {
@@ -164,6 +164,14 @@ export async function enrollQuest(quest: Quest): Promise<boolean> {
 }
 
 export async function enrollAll(): Promise<void> {
+    if (isCurrentlyRateLimited()) {
+        const remaining = getRemainingRateLimitSec();
+        const mins = Math.ceil(remaining / 60);
+        const timeStr = remaining > 60 ? `~${mins} minutes (${remaining}s)` : `${remaining}s`;
+        log(`⚠️ Cannot enroll right now: Discord rate limit is active. Please wait ${timeStr}.`, "warn", true);
+        return;
+    }
+
     const unenrolled = getUnenrolledQuests();
     if (!unenrolled.length) {
         log("No new quests to enroll in.", "warn", true);
@@ -172,7 +180,15 @@ export async function enrollAll(): Promise<void> {
 
     log(`Enrolling in ${unenrolled.length} new quests...`, "info", true);
     for (const q of unenrolled) {
-        await enrollQuest(q);
+        if (isCurrentlyRateLimited()) {
+            log(`⚠️ Enrollment paused: Discord rate limit active.`, "warn", true);
+            break;
+        }
+        const ok = await enrollQuest(q);
+        if (!ok && isCurrentlyRateLimited()) {
+            break;
+        }
+        await new Promise(r => setTimeout(r, 1000));
     }
 }
 

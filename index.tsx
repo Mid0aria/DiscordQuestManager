@@ -18,6 +18,7 @@ import { openQuestManagerModal } from "./components/QuestModal";
 import { mountOverlay, unmountOverlay } from "./components/QuestOverlay";
 import { startExpiryWatcher, stopExpiryWatcher } from "./core/expiryWatcher";
 import { AppState, log, setRunning } from "./core/state";
+import { scanRegionsNow, startVpnScanner, stopVpnScanner } from "./core/vpnScanner";
 import { initQueue, stopAndCleanup } from "./core/worker";
 import { settings } from "./settings";
 
@@ -31,6 +32,7 @@ export default definePlugin({
     settings,
     toolboxActions: {
         "Quest Manager": () => openQuestManagerModal(),
+        "Scan Regional Quests (VPN)": () => scanRegionsNow({ manual: true }),
         "Toggle Quest Overlay": () => {
             settings.store.showOverlay = !settings.store.showOverlay;
         }
@@ -106,12 +108,14 @@ export default definePlugin({
 
         mountOverlay();
         startExpiryWatcher();
+        startVpnScanner();
     },
 
     isRunning: false,
 
     stop() {
         this.isRunning = false;
+        stopVpnScanner();
         stopAndCleanup();
         unmountOverlay();
         stopExpiryWatcher();

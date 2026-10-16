@@ -8,10 +8,16 @@ import { RestAPI } from "@webpack/common";
 
 import { addQuestToHistory } from "../core/db";
 import { withRetry } from "../core/http";
-import { log, sleep } from "../core/state";
+import { debugLog, getRemainingRateLimitSec, isCurrentlyRateLimited, log, markRateLimited, sleep } from "../core/state";
 import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
 import { Quest, QuestTaskInfo, SUPPORTED_TASKS, SupportedTask } from "../types";
+
+export const failedEnrollmentQuestIds = new Set<string>();
+
+export function clearFailedEnrollmentCache(): void {
+    failedEnrollmentQuestIds.clear();
+}
 
 export function getQuestName(quest: Quest): string {
     return quest.config?.messages?.questName ||
@@ -24,7 +30,55 @@ export function getQuestName(quest: Quest): string {
 export function getQuestExpiresAt(quest: Quest): string {
     return quest.config?.expiresAt ||
         quest.config?.expires_at ||
+        (quest as any)?.expiresAt ||
+        (quest as any)?.expires_at ||
         "";
+}
+
+export function getQuestStartsAt(quest: Quest): string {
+    return quest.config?.startsAt ||
+        (quest.config as any)?.starts_at ||
+        (quest as any)?.startsAt ||
+        (quest as any)?.starts_at ||
+        "";
+}
+
+export function isQuestExpired(quest: Quest): boolean {
+    const expiresAt = getQuestExpiresAt(quest);
+    if (!expiresAt) return false;
+    const time = new Date(expiresAt).getTime();
+    return !isNaN(time) && time <= Date.now();
+}
+
+export function isQuestStarted(quest: Quest): boolean {
+    const startsAt = getQuestStartsAt(quest);
+    if (!startsAt) return true;
+    const time = new Date(startsAt).getTime();
+    return isNaN(time) || time <= Date.now();
+}
+
+export function isQuestValidForEnrollment(quest: Quest): boolean {
+    if (!quest || !quest.id) return false;
+    if (failedEnrollmentQuestIds.has(quest.id)) return false;
+
+    const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
+    const isCompleted = !!(status?.completedAt || status?.completed_at);
+    if (isCompleted) return false;
+
+    const isEnrolled = !!(status?.enrolledAt || status?.enrolled_at);
+    if (isEnrolled) return false;
+
+    if (isQuestExpired(quest)) return false;
+    if (!isQuestStarted(quest)) return false;
+
+    const info = getTaskInfo(quest);
+    if (!info.name) return false;
+
+    const { store } = settings;
+    if (info.name.includes("VIDEO") && !store.enableVideoQuests) return false;
+    if ((info.name.includes("ACTIVITY") || info.name.includes("STREAM") || info.name.includes("PLAY")) && !store.enableActivityQuests) return false;
+
+    return true;
 }
 
 export function getTaskInfo(quest: Quest): QuestTaskInfo {
@@ -127,8 +181,7 @@ export function buildQueue(): Quest[] {
             const completedAt = status?.completedAt ?? status?.completed_at;
             if (!enrolledAt || completedAt) return false;
 
-            const expiresAt = getQuestExpiresAt(x);
-            if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return false;
+            if (isQuestExpired(x)) return false;
 
             const info = getTaskInfo(x);
             if (!info.name) return false;
@@ -151,8 +204,7 @@ export function getUnenrolledQuests(): Quest[] {
         const completedAt = status?.completedAt ?? status?.completed_at;
         if (enrolledAt || completedAt) return false;
 
-        const expiresAt = getQuestExpiresAt(x);
-        if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return false;
+        if (isQuestExpired(x)) return false;
 
         const info = getTaskInfo(x);
         if (!info.name) return false;
@@ -170,15 +222,49 @@ export function getAllQuests(): Quest[] {
 }
 
 export async function enroll(quest: Quest): Promise<boolean> {
+    if (!quest?.id) return false;
+    if (isCurrentlyRateLimited()) {
+        const remaining = getRemainingRateLimitSec();
+        const mins = Math.ceil(remaining / 60);
+        const timeStr = remaining > 60 ? `~${mins}m (${remaining}s)` : `${remaining}s`;
+        debugLog(`[QuestManager] Skipping enroll for "${getQuestName(quest)}": Rate limit active (${timeStr} remaining)`);
+        return false;
+    }
+    if (failedEnrollmentQuestIds.has(quest.id)) return false;
+
     const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
     if (status?.enrolledAt || status?.enrolled_at) return true;
+
     const questName = getQuestName(quest);
+
+    if (isQuestExpired(quest)) {
+        failedEnrollmentQuestIds.add(quest.id);
+        debugLog(`[QuestManager] Skipping expired quest: "${questName}"`);
+        return false;
+    }
+
+    if (!isQuestStarted(quest)) {
+        debugLog(`[QuestManager] Skipping quest not started yet: "${questName}"`);
+        return false;
+    }
+
     try {
+        let enrolledOk = false;
         if (QuestActions && typeof QuestActions.enrollInQuest === "function") {
             try {
-                await QuestActions.enrollInQuest(quest.id, { location: 11, platform: 0 });
-            } catch {
-                await withRetry(() => RestAPI.post({
+                await Promise.race([
+                    QuestActions.enrollInQuest(quest.id, { location: 11, platform: 0 }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("QuestActions timeout")), 4000))
+                ]);
+                enrolledOk = true;
+            } catch (actionErr: any) {
+                if (actionErr?.status === 429) throw actionErr;
+            }
+        }
+
+        if (!enrolledOk) {
+            await Promise.race([
+                RestAPI.post({
                     url: `/quests/${quest.id}/enroll`,
                     body: {
                         location: 11,
@@ -186,27 +272,34 @@ export async function enroll(quest: Quest): Promise<boolean> {
                         is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
                         traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
                     }
-                }));
-            }
-        } else {
-            await withRetry(() => RestAPI.post({
-                url: `/quests/${quest.id}/enroll`,
-                body: {
-                    location: 11,
-                    platform: 0,
-                    is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
-                    traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
-                }
-            }));
+                }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("RestAPI timeout")), 6000))
+            ]);
         }
+
         log(`Enrolled: ${questName}`, "success", true);
         quest.userStatus = quest.userStatus || {};
         quest.userStatus.enrolledAt = new Date().toISOString();
-        await sleep(1500);
+        await sleep(500);
         return true;
-    } catch (e) {
+    } catch (e: any) {
         console.error("[QuestManager]", e);
-        log(`Enrollment failed: ${questName}`, "error", true);
+        const is429 = e?.status === 429;
+        if (is429) {
+            const retryAfterSec = typeof e?.body?.retry_after === "number"
+                ? e.body.retry_after
+                : typeof e?.headers?.["retry-after"] === "string"
+                    ? parseFloat(e.headers["retry-after"])
+                    : 60;
+            markRateLimited(retryAfterSec);
+            const remaining = getRemainingRateLimitSec();
+            const mins = Math.ceil(remaining / 60);
+            const timeStr = remaining > 60 ? `~${mins} min (${remaining}s)` : `${remaining}s`;
+            log(`⚠️ Rate limited on enrollment: Discord requires waiting ${timeStr}.`, "warn", true);
+        } else {
+            failedEnrollmentQuestIds.add(quest.id);
+            log(`Enrollment failed: ${questName}`, "error", true);
+        }
         return false;
     }
 }

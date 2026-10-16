@@ -6,7 +6,10 @@
 
 import { execFile as cpExecFile, ExecFileOptions } from "node:child_process";
 import { readdir } from "node:fs/promises";
+import * as http from "node:http";
+import * as https from "node:https";
 import { join } from "node:path";
+import { URL } from "node:url";
 import { promisify } from "node:util";
 
 const execFile = promisify(cpExecFile);
@@ -144,3 +147,86 @@ export async function questManagerGetNewCommits(): Promise<GitResult> {
 }
 
 export function isQuestManagerNativeBridge() { return true; }
+ 
+export interface McpRequestOptions {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    timeoutMs?: number;
+}
+
+export interface McpResponse {
+    ok: boolean;
+    status?: number;
+    headers?: Record<string, string>;
+    body?: string;
+    error?: string;
+}
+
+export async function questManagerMcpRequest(
+    _: any,
+    options: McpRequestOptions
+): Promise<McpResponse> {
+    return new Promise(resolve => {
+        try {
+            const parsedUrl = new URL(options.url);
+            const isHttps = parsedUrl.protocol === "https:";
+            const transport = isHttps ? https : http;
+
+            const req = transport.request(parsedUrl, {
+                method: options.method || "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json, text/event-stream",
+                    ...(options.headers || {})
+                },
+                timeout: options.timeoutMs || 25000
+            }, res => {
+                let data = "";
+                res.on("data", (chunk: Buffer) => {
+                    data += chunk.toString("utf8");
+                });
+                res.on("end", () => {
+                    const headers: Record<string, string> = {};
+                    for (const [k, v] of Object.entries(res.headers)) {
+                        if (typeof v === "string") headers[k.toLowerCase()] = v;
+                        else if (Array.isArray(v)) headers[k.toLowerCase()] = v.join(", ");
+                    }
+                    resolve({
+                        ok: (res.statusCode ?? 500) >= 200 && (res.statusCode ?? 500) < 300,
+                        status: res.statusCode,
+                        headers,
+                        body: data
+                    });
+                });
+            });
+
+            req.on("error", (err: any) => {
+                resolve({
+                    ok: false,
+                    error: err?.message || String(err)
+                });
+            });
+
+            req.on("timeout", () => {
+                req.destroy();
+                resolve({
+                    ok: false,
+                    error: "Request timed out"
+                });
+            });
+
+            if (options.body) {
+                req.write(options.body);
+            }
+            req.end();
+        } catch (e: any) {
+            resolve({
+                ok: false,
+                error: e?.message || String(e)
+            });
+        }
+    });
+}
+

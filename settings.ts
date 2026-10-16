@@ -6,31 +6,35 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
+import { React } from "@webpack/common";
+
+import { RegionPickerSettingsButton } from "./components/RegionPickerModal";
 
 export const settings = definePluginSettings({
     autoStart: {
         type: OptionType.BOOLEAN,
         description: "Automatically start quests when Discord opens.",
-        default: false
+        default: false,
     },
     notifyOnNew: {
         type: OptionType.BOOLEAN,
-        description: "Send notification when a new or incomplete quest is found.",
-        default: true
+        description:
+            "Send notification when a new or incomplete quest is found.",
+        default: true,
     },
     videoSpeed: {
         type: OptionType.SLIDER,
         description: "Progress speed multiplier for video quests.",
         default: 7,
         markers: [1, 2, 5, 7, 10, 15],
-        stickToMarkers: false
+        stickToMarkers: false,
     },
     activityInterval: {
         type: OptionType.SLIDER,
         description: "Heartbeat interval (seconds) for game/activity quests.",
         default: 20,
         markers: [10, 20, 30, 45, 60],
-        stickToMarkers: true
+        stickToMarkers: true,
     },
     questSortOrder: {
         type: OptionType.SELECT,
@@ -39,65 +43,71 @@ export const settings = definePluginSettings({
         options: [
             { label: "Video Quests First", value: "video_first" },
             { label: "Activity Quests First", value: "activity_first" },
-            { label: "Expiring Soonest", value: "expiring" }
-        ]
+            { label: "Expiring Soonest", value: "expiring" },
+        ],
     },
     autoClaimRewards: {
         type: OptionType.BOOLEAN,
         description: "Automatically claim rewards when a quest is completed.",
-        default: false
+        default: false,
     },
     hideCompletedQuests: {
         type: OptionType.BOOLEAN,
         description: "Hide completed quests from the Quest Manager modal.",
-        default: false
+        default: false,
     },
     playCompletionSound: {
         type: OptionType.BOOLEAN,
-        description: "Play a celebratory chime sound when a quest is completed.",
-        default: true
+        description:
+            "Play a celebratory chime sound when a quest is completed.",
+        default: true,
     },
     enableVideoQuests: {
         type: OptionType.BOOLEAN,
         description: "Enable watching video quests.",
-        default: true
+        default: true,
     },
     enableActivityQuests: {
         type: OptionType.BOOLEAN,
         description: "Enable playing/streaming activity quests.",
-        default: true
+        default: true,
     },
     pauseWhileInVoice: {
         type: OptionType.BOOLEAN,
-        description: "Automatically pause quest processing when you join a voice channel.",
-        default: false
+        description:
+            "Automatically pause quest processing when you join a voice channel.",
+        default: false,
     },
     pauseOnGameConflict: {
         type: OptionType.BOOLEAN,
-        description: "Pause quests when you are playing a real game or streaming to prevent conflicts.",
-        default: true
+        description:
+            "Pause quests when you are playing a real game or streaming to prevent conflicts.",
+        default: true,
     },
     runOnlyWhenIdle: {
         type: OptionType.BOOLEAN,
         description: "Only process quests when Discord is idle / AFK.",
-        default: false
+        default: false,
     },
     autoRequeueFailed: {
         type: OptionType.BOOLEAN,
-        description: "Automatically move failed quests to the end of the queue for retry.",
-        default: true
+        description:
+            "Automatically move failed quests to the end of the queue for retry.",
+        default: true,
     },
     delayBetweenQuests: {
         type: OptionType.SLIDER,
-        description: "Delay (in seconds) between finishing one quest and starting the next.",
+        description:
+            "Delay (in seconds) between finishing one quest and starting the next.",
         default: 5,
         markers: [0, 5, 10, 15, 30],
-        stickToMarkers: true
+        stickToMarkers: true,
     },
     randomizeProgress: {
         type: OptionType.BOOLEAN,
-        description: "Randomize heartbeat progress intervals and video speed slightly to appear more human.",
-        default: true
+        description:
+            "Randomize heartbeat progress intervals and video speed slightly to appear more human.",
+        default: true,
     },
     logLevel: {
         type: OptionType.SELECT,
@@ -107,13 +117,14 @@ export const settings = definePluginSettings({
             { label: "All Messages", value: "all" },
             { label: "Completions Only", value: "completed_only" },
             { label: "Errors Only", value: "errors_only" },
-            { label: "Silent (No Toasts)", value: "none" }
-        ]
+            { label: "Silent (No Toasts)", value: "none" },
+        ],
     },
     showOverlay: {
         type: OptionType.BOOLEAN,
-        description: "Show a widget in the bottom right corner with the active quest status.",
-        default: true
+        description:
+            "Show a widget in the bottom right corner with the active quest status.",
+        default: true,
     },
     overlayStyle: {
         type: OptionType.SELECT,
@@ -121,36 +132,107 @@ export const settings = definePluginSettings({
         default: "standard",
         options: [
             { label: "Standard Box", value: "standard" },
-            { label: "Compact Mini-Pill", value: "pill" }
-        ]
+            { label: "Compact Mini-Pill", value: "pill" },
+        ],
     },
     overlayOpacity: {
         type: OptionType.SLIDER,
         description: "Base opacity percentage for the floating overlay.",
         default: 85,
         markers: [40, 60, 75, 85, 100],
-        stickToMarkers: false
+        stickToMarkers: false,
     },
     autoCheckUpdates: {
         type: OptionType.BOOLEAN,
-        description: "Automatically check for QuestManager updates (git pull) shortly after Discord starts.",
-        default: true
+        description:
+            "Automatically check for QuestManager updates (git pull) shortly after Discord starts.",
+        default: true,
     },
     enableExpiryWarnings: {
         type: OptionType.BOOLEAN,
         description: "Warn when an in-progress quest is about to expire.",
-        default: true
+        default: true,
     },
     expiryWarningHours: {
         type: OptionType.SLIDER,
         description: "How many hours before expiration to send the warning.",
         default: 24,
         markers: [1, 6, 12, 24, 48],
-        stickToMarkers: false
+        stickToMarkers: false,
     },
     debugMode: {
         type: OptionType.BOOLEAN,
-        description: "Enable developer Debug Mode (adds a Debug tab in Quest Manager for inspecting raw API payloads, store states, and live logs).",
-        default: false
-    }
+        description:
+            "Enable developer Debug Mode (adds a Debug tab in Quest Manager for inspecting raw API payloads, store states, and live logs).",
+        default: false,
+    },
+
+    // --- Core Automated Quest Scanner & Auto-Completion (VPN-independent) ---
+    autoScanNewQuests: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Periodically check for newly released Discord quests in the background, auto-enroll, and auto-complete them.",
+        default: true,
+    },
+    scanIntervalHours: {
+        type: OptionType.SLIDER,
+        description:
+            "Interval in hours between automated background quest scans.",
+        default: 4,
+        markers: [1, 2, 4, 6, 12, 24],
+        stickToMarkers: true,
+    },
+    autoEnrollNewQuests: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Automatically enroll in newly discovered quests found during background scan.",
+        default: true,
+    },
+    autoStartOnNewQuests: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Automatically start processing newly discovered and enrolled quests.",
+        default: true,
+    },
+
+    // --- ExpressVPN Regional Multi-Country Scanner Add-on (Optional) ---
+    enableVpnScanner: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Enable ExpressVPN multi-country scanner to discover and auto-enroll country-exclusive quests.",
+        default: false,
+    },
+    vpnMcpUrl: {
+        type: OptionType.STRING,
+        description:
+            "ExpressVPN MCP server endpoint URL with token (e.g. http://127.0.0.1:20090/mcp?token=...)",
+        default: "http://127.0.0.1:20090/mcp?token=12345abcde",
+    },
+    vpnTargetRegions: {
+        type: OptionType.STRING,
+        description:
+            "Selected ExpressVPN regions to scan.",
+        default: "smart, usa-new-york, germany-frankfurt-1, uk-london",
+        hidden: true,
+    },
+    vpnTargetRegionsPicker: {
+        type: OptionType.COMPONENT,
+        description:
+            "Choose which ExpressVPN countries/regions to scan using checkboxes.",
+        component: () => React.createElement(RegionPickerSettingsButton, null),
+    },
+    vpnDisconnectAfterScan: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Restore previous VPN state or disconnect ExpressVPN after scanning finishes.",
+        default: true,
+    },
+    vpnCooldownSec: {
+        type: OptionType.SLIDER,
+        description:
+            "Cooldown delay (seconds) after switching VPN region before querying Discord quests.",
+        default: 6,
+        markers: [3, 5, 8, 12, 15],
+        stickToMarkers: true,
+    },
 });

@@ -41,6 +41,21 @@ export const setRunning = (v: boolean) => { isRunning = v; };
 
 export const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
+let rateLimitUntil = 0;
+export function markRateLimited(retryAfterSec: number = 60) {
+    const durationMs = Math.max(5, Math.ceil(retryAfterSec)) * 1000;
+    rateLimitUntil = Math.max(rateLimitUntil, Date.now() + durationMs);
+}
+export function isCurrentlyRateLimited(): boolean {
+    return Date.now() < rateLimitUntil;
+}
+export function getRemainingRateLimitSec(): number {
+    return Math.max(0, Math.ceil((rateLimitUntil - Date.now()) / 1000));
+}
+export function clearRateLimit(): void {
+    rateLimitUntil = 0;
+}
+
 export interface DebugLogEntry {
     id: number;
     time: string;

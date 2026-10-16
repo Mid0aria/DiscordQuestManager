@@ -7,13 +7,17 @@
 import { ButtonCompat } from "@components/Button";
 import { React, RestAPI, showToast, useEffect, useMemo, useState } from "@webpack/common";
 
-import { getAllQuests, getQuestName, getQuestReward, getTaskInfo } from "../api/questApi";
-import { AppState, clearDebugLogs, debugLogs, isRunning } from "../core/state";
+import { clearFailedEnrollmentCache, failedEnrollmentQuestIds, getAllQuests, getQuestName, getQuestReward, getTaskInfo } from "../api/questApi";
+import { vpnClient } from "../api/vpnClient";
+import { AppState, clearDebugLogs, debugLogs, getRemainingRateLimitSec, isCurrentlyRateLimited, isRunning } from "../core/state";
 import { ChannelStore, IdleStore, QuestActions, QuestsStore, RunningGameStore, StreamingStore } from "../core/stores";
+import { getVpnScannerState, resetScannerLock, scanRegionsNow } from "../core/vpnScanner";
+import { settings } from "../settings";
 import { Quest } from "../types";
+import { addRegionChangeListener, openRegionPickerModal } from "./RegionPickerModal";
 
 export function DebugView() {
-    const [subTab, setSubTab] = useState<"explorer" | "probe" | "stores" | "logs">("explorer");
+    const [subTab, setSubTab] = useState<"explorer" | "probe" | "stores" | "logs" | "vpn">("explorer");
     const [allQuests, setAllQuests] = useState<Quest[]>([]);
     const [selectedQuestId, setSelectedQuestId] = useState<string>("");
     const [jsonSearchQuery, setJsonSearchQuery] = useState("");
@@ -22,6 +26,24 @@ export function DebugView() {
     const [logFilter, setLogFilter] = useState<"all" | "info" | "success" | "warn" | "error">("all");
     const [logSearch, setLogSearch] = useState("");
     const [logsVersion, setLogsVersion] = useState(0);
+    const [targetRegionsStr, setTargetRegionsStr] = useState(() => settings.store.vpnTargetRegions || "None");
+
+    useEffect(() => {
+        return addRegionChangeListener(val => setTargetRegionsStr(val));
+    }, []);
+
+    // ExpressVPN MCP states
+    const [vpnStatus, setVpnStatus] = useState<{
+        tested: boolean;
+        state?: string;
+        region?: string;
+        statusText?: string;
+        error?: string;
+    } | null>(null);
+    const [vpnLoading, setVpnLoading] = useState(false);
+    const [vpnRegions, setVpnRegions] = useState<string[]>([]);
+    const [selectedVpnRegion, setSelectedVpnRegion] = useState("");
+    const [vpnScanRunning, setVpnScanRunning] = useState(false);
 
     const refreshQuests = () => {
         try {
@@ -97,6 +119,97 @@ export function DebugView() {
             showToast({ text: `Probe ${url} failed`, variant: "critical" });
         } finally {
             setProbeLoading(false);
+        }
+    };
+
+    const testVpn = async () => {
+        setVpnLoading(true);
+        try {
+            const testRes = await vpnClient.testConnection();
+            let statusText = "";
+            try {
+                statusText = await vpnClient.getStatus();
+            } catch {
+                // ignore
+            }
+            setVpnStatus({
+                tested: true,
+                state: testRes.state,
+                region: testRes.region,
+                statusText,
+                error: testRes.error
+            });
+            if (testRes.ok) {
+                showToast({ text: `ExpressVPN: ${testRes.state || "OK"}`, variant: "success" });
+            } else {
+                showToast({ text: `ExpressVPN error: ${testRes.error}`, variant: "critical" });
+            }
+        } catch (e: any) {
+            setVpnStatus({
+                tested: true,
+                error: e?.message || String(e)
+            });
+            showToast({ text: "ExpressVPN connection error", variant: "critical" });
+        } finally {
+            setVpnLoading(false);
+        }
+    };
+
+    const fetchVpnRegions = async () => {
+        setVpnLoading(true);
+        try {
+            const list = await vpnClient.getRegions();
+            setVpnRegions(list);
+            if (list.length > 0 && !selectedVpnRegion) {
+                setSelectedVpnRegion(list[0]);
+            }
+            showToast({ text: `Loaded ${list.length} ExpressVPN regions`, variant: "success" });
+        } catch (e: any) {
+            showToast({ text: `Failed to fetch regions: ${e?.message || String(e)}`, variant: "critical" });
+        } finally {
+            setVpnLoading(false);
+        }
+    };
+
+    const connectVpnRegion = async (reg: string) => {
+        if (!reg) return;
+        setVpnLoading(true);
+        try {
+            showToast({ text: `Connecting to ${reg}...` });
+            await vpnClient.connect(reg, 25);
+            showToast({ text: `Connected to ${reg}!`, variant: "success" });
+            await testVpn();
+        } catch (e: any) {
+            showToast({ text: `Connect failed: ${e?.message || String(e)}`, variant: "critical" });
+        } finally {
+            setVpnLoading(false);
+        }
+    };
+
+    const disconnectVpn = async () => {
+        setVpnLoading(true);
+        try {
+            showToast({ text: "Disconnecting ExpressVPN..." });
+            await vpnClient.disconnect(15);
+            showToast({ text: "ExpressVPN disconnected", variant: "success" });
+            await testVpn();
+        } catch (e: any) {
+            showToast({ text: `Disconnect failed: ${e?.message || String(e)}`, variant: "critical" });
+        } finally {
+            setVpnLoading(false);
+        }
+    };
+
+    const triggerVpnScan = async () => {
+        setVpnScanRunning(true);
+        try {
+            const res = await scanRegionsNow({ manual: true });
+            if (res.ok) {
+                showToast({ text: `Scan finished! Enrolled: ${res.totalEnrolled}`, variant: "success" });
+            }
+            refreshQuests();
+        } finally {
+            setVpnScanRunning(false);
         }
     };
 
@@ -197,6 +310,12 @@ export function DebugView() {
                     onClick={() => setSubTab("logs")}
                 >
                     📜 Event Logs ({debugLogs.length})
+                </button>
+                <button
+                    className={`vc-quest-debug-subtab ${subTab === "vpn" ? "active" : ""}`}
+                    onClick={() => setSubTab("vpn")}
+                >
+                    🌍 ExpressVPN MCP
                 </button>
             </div>
 
@@ -444,8 +563,8 @@ export function DebugView() {
             {/* TAB 4: LIVE CONSOLE LOGS */}
             {subTab === "logs" && (
                 <div className="vc-quest-debug-tab-content">
-                    <div className="vc-quest-debug-toolbar" style={{ justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div className="vc-quest-debug-toolbar" style={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "12px", color: "var(--text-muted, #b5bac1)" }}>Level:</span>
                             {(["all", "info", "success", "warn", "error"] as const).map(lvl => (
                                 <button
@@ -458,7 +577,7 @@ export function DebugView() {
                                 </button>
                             ))}
                         </div>
-                        <div style={{ display: "flex", gap: "8px" }}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                             <input
                                 type="text"
                                 placeholder="Search logs..."
@@ -501,6 +620,225 @@ export function DebugView() {
                             ))
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* TAB 5: EXPRESSVPN MCP */}
+            {subTab === "vpn" && (
+                <div className="vc-quest-debug-tab-content">
+                    <p style={{ color: "var(--text-muted, #b5bac1)", fontSize: "13px", margin: "0 0 14px 0" }}>
+                        Interact with the local ExpressVPN Model Context Protocol (MCP) server to inspect connection states, switch server locations, and run regional bypass scans.
+                    </p>
+
+                    {/* Rate Limit Warning Banner if active */}
+                    {isCurrentlyRateLimited() && (
+                        <div style={{ backgroundColor: "#3a2a14", border: "1px solid #f9e2af", borderRadius: "8px", padding: "10px 14px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <span style={{ color: "#f9e2af", fontSize: "13px" }}>
+                                ⏳ <strong>Discord REST Rate Limit Active:</strong> Pausing quest enrollment for ~{getRemainingRateLimitSec()}s to protect your account.
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Active Configuration Overview Card */}
+                    <div className="vc-quest-debug-probe-card" style={{ marginBottom: "14px" }}>
+                        <div className="vc-quest-debug-probe-card-header">
+                            <span style={{ fontWeight: 600, color: "var(--text-normal, #dbdee1)" }}>
+                                ⚙️ VPN Scanner Configuration
+                            </span>
+                            <span className={`vc-quest-debug-badge ${settings.store.enableVpnScanner ? "ok" : "idle"}`}>
+                                {settings.store.enableVpnScanner ? "Scanner Active" : "Scanner Disabled"}
+                            </span>
+                        </div>
+                        <div className="vc-quest-debug-meta-box" style={{ margin: 0 }}>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>MCP URL:</strong>
+                                <code>{settings.store.vpnMcpUrl || "Not configured"}</code>
+                            </div>
+                            <div className="vc-quest-debug-meta-row" style={{ alignItems: "center" }}>
+                                <strong>Target Regions:</strong>
+                                <span style={{ flex: 1 }}>{targetRegionsStr || "None"}</span>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.MIN}
+                                    color={ButtonCompat.Colors.BRAND}
+                                    onClick={openRegionPickerModal}
+                                    style={{ marginLeft: "8px" }}
+                                >
+                                    🗺️ Checklist
+                                </ButtonCompat>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>Scan Interval:</strong>
+                                <span>Every {settings.store.scanIntervalHours || 4} hour(s)</span>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>Cooldown Delay:</strong>
+                                <span>{settings.store.vpnCooldownSec || 6} seconds per region</span>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>Post-Scan Behavior:</strong>
+                                <span>{settings.store.vpnDisconnectAfterScan ? "Restore Previous / Disconnect" : "Stay on Last Region"}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Live MCP Diagnostics Card */}
+                    <div className="vc-quest-debug-probe-card" style={{ marginBottom: "14px" }}>
+                        <div className="vc-quest-debug-probe-card-header">
+                            <span style={{ fontWeight: 600, color: "var(--text-normal, #dbdee1)" }}>
+                                🛡️ ExpressVPN MCP Live State
+                            </span>
+                            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.SMALL}
+                                    color={ButtonCompat.Colors.BRAND}
+                                    onClick={testVpn}
+                                    disabled={vpnLoading}
+                                >
+                                    {vpnLoading ? "Connecting..." : "⚡ Test Connection"}
+                                </ButtonCompat>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.SMALL}
+                                    color={ButtonCompat.Colors.PRIMARY}
+                                    onClick={fetchVpnRegions}
+                                    disabled={vpnLoading}
+                                >
+                                    🗺️ Get Regions ({vpnRegions.length})
+                                </ButtonCompat>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.SMALL}
+                                    color={ButtonCompat.Colors.RED}
+                                    onClick={disconnectVpn}
+                                    disabled={vpnLoading}
+                                >
+                                    🔌 Disconnect
+                                </ButtonCompat>
+                            </div>
+                        </div>
+
+                        <div className="vc-quest-debug-meta-box" style={{ margin: 0 }}>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>Connection State:</strong>
+                                <span className={`vc-quest-debug-badge ${vpnStatus?.state?.toLowerCase() === "connected" ? "ok" : "err"}`}>
+                                    {vpnStatus?.state || (vpnStatus?.tested ? "Disconnected" : "Untested")}
+                                </span>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>Current Region:</strong>
+                                <span>{vpnStatus?.region || "None / Inactive"}</span>
+                            </div>
+                            {vpnStatus?.error && (
+                                <div className="vc-quest-debug-meta-row">
+                                    <strong>Last Error:</strong>
+                                    <span style={{ color: "#f38ba8" }}>{vpnStatus.error}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Manual Region Switcher & Scan Card */}
+                    <div className="vc-quest-debug-probe-card" style={{ marginBottom: "14px" }}>
+                        <span style={{ fontWeight: 600, color: "var(--text-normal, #dbdee1)" }}>
+                            🌐 Manual Actions & Regional Scan
+                        </span>
+
+                        <div className="vc-quest-debug-row" style={{ alignItems: "flex-end", gap: "10px", flexWrap: "wrap" }}>
+                            <div style={{ flex: 1, minWidth: "200px" }}>
+                                <label className="vc-quest-debug-label">Connect to Specific Region:</label>
+                                {vpnRegions.length > 0 ? (
+                                    <select
+                                        className="vc-quest-debug-select"
+                                        value={selectedVpnRegion}
+                                        onChange={e => setSelectedVpnRegion(e.target.value)}
+                                    >
+                                        {vpnRegions.map(r => (
+                                            <option key={r} value={r}>{r}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input
+                                        className="vc-quest-debug-input"
+                                        placeholder="e.g. smart, usa-new-york, germany-frankfurt-1"
+                                        value={selectedVpnRegion}
+                                        onChange={e => setSelectedVpnRegion(e.target.value)}
+                                    />
+                                )}
+                            </div>
+                            <ButtonCompat
+                                color={ButtonCompat.Colors.BRAND}
+                                onClick={() => connectVpnRegion(selectedVpnRegion)}
+                                disabled={vpnLoading || !selectedVpnRegion}
+                                style={{ flexShrink: 0 }}
+                            >
+                                🚀 Connect Region
+                            </ButtonCompat>
+                        </div>
+
+                        <div style={{ borderTop: "1px solid var(--background-modifier-accent)", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+                            <div>
+                                <span style={{ fontWeight: 600, display: "block", color: "var(--text-normal, #dbdee1)" }}>
+                                    🌍 Execute Full Target Scan
+                                </span>
+                                <span style={{ fontSize: "12px", color: "var(--text-muted, #b5bac1)" }}>
+                                    Iterates through: {settings.store.vpnTargetRegions || "smart"}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                {(getVpnScannerState().isScanning || vpnScanRunning) && (
+                                    <ButtonCompat
+                                        size={ButtonCompat.Sizes.SMALL}
+                                        color={ButtonCompat.Colors.RED}
+                                        onClick={() => {
+                                            resetScannerLock();
+                                            setVpnScanRunning(false);
+                                            showToast({ text: "Scanner lock reset 🔓", variant: "success" });
+                                        }}
+                                    >
+                                        🔓 Reset Lock
+                                    </ButtonCompat>
+                                )}
+                                {failedEnrollmentQuestIds.size > 0 && (
+                                    <ButtonCompat
+                                        size={ButtonCompat.Sizes.SMALL}
+                                        color={ButtonCompat.Colors.PRIMARY}
+                                        onClick={() => {
+                                            clearFailedEnrollmentCache();
+                                            showToast({ text: "Cleared failed quest blacklist", variant: "success" });
+                                        }}
+                                    >
+                                        🧹 Clear Blacklist ({failedEnrollmentQuestIds.size})
+                                    </ButtonCompat>
+                                )}
+                                <ButtonCompat
+                                    color={ButtonCompat.Colors.GREEN}
+                                    onClick={triggerVpnScan}
+                                    disabled={vpnScanRunning || vpnLoading}
+                                >
+                                    {vpnScanRunning ? "🔄 Scanning..." : "▶ Run Scan Now"}
+                                </ButtonCompat>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Raw VPN Status Output */}
+                    {vpnStatus?.statusText && (
+                        <div className="vc-quest-debug-probe-card">
+                            <div className="vc-quest-debug-probe-card-header">
+                                <span style={{ fontWeight: 600, color: "var(--text-normal, #dbdee1)" }}>
+                                    📜 Raw Status Output
+                                </span>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.MIN}
+                                    color={ButtonCompat.Colors.PRIMARY}
+                                    onClick={() => copyToClipboard(vpnStatus.statusText!, "Status")}
+                                >
+                                    📋 Copy
+                                </ButtonCompat>
+                            </div>
+                            <pre className="vc-quest-debug-json-pre">
+                                <code>{vpnStatus.statusText}</code>
+                            </pre>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

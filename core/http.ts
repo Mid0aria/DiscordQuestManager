@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { log, sleep } from "./state";
+import { log, markRateLimited, sleep } from "./state";
 
 /**
  * Runs `fn`, retrying on HTTP 429 (rate limited) and 5xx (server error) responses
@@ -24,6 +24,7 @@ export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promis
 
             let waitMs = Math.pow(2, attempt) * 1000;
             if (isRateLimit) {
+                markRateLimited();
                 const retryAfterSec = typeof e?.body?.retry_after === "number"
                     ? e.body.retry_after
                     : typeof e?.headers?.["retry-after"] === "string"
