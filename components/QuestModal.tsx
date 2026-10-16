@@ -6,15 +6,18 @@
 
 import { ButtonCompat } from "@components/Button";
 import { ModalContent, ModalRoot, ModalSize, openModal } from "@utils/modal";
-import { React, showToast, ThemeStore, Toasts, useEffect, useMemo, useState } from "@webpack/common";
+import { React, showToast, ThemeStore, useEffect, useMemo, useState } from "@webpack/common";
 
-import { calculateTotalQueueETA, claimQuestReward, formatETA, getAllQuests, getQuestReward, getTaskInfo, getUnenrolledQuests } from "../api/questApi";
+import { calculateTotalQueueETA, claimQuestReward, formatETA, getAllQuests, getQuestExpiresAt, getQuestName, getQuestReward, getTaskInfo, getUnenrolledQuests } from "../api/questApi";
 import { applyUpdate, checkForUpdates, isOutdated } from "../api/updater";
 import { clearUserHistory, getUserStats, markRewardCodeUsed, UserStats } from "../core/db";
 import { AppState, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
 import { enrollAll, enrollQuest, initQueue, moveQueueItem, pauseWorker, removeFromQueue, resumeWorker, runWorker, skipCurrentQuest } from "../core/worker";
+import { settings } from "../settings";
 import { ORB_ICON_URL, Quest } from "../types";
+import { getRedeemInfo } from "../utils/redeem";
+import { DebugView } from "./DebugView";
 import { ProgressBar } from "./ProgressBar";
 import { QuestListItem } from "./QuestListItem";
 import { StatusIcon } from "./StatusIcon";
@@ -25,7 +28,7 @@ interface QuestManagerModalProps {
 
 export function QuestManagerModal({ props }: QuestManagerModalProps) {
     const [now, setNow] = useState(Date.now());
-    const [activeTab, setActiveTab] = useState<"quests" | "vault" | "stats">("quests");
+    const [activeTab, setActiveTab] = useState<"quests" | "vault" | "stats" | "debug">("quests");
     const [userStats, setUserStats] = useState<UserStats | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<"all" | "video" | "activity" | "expiring" | "orbs">("all");
@@ -83,7 +86,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
     // Filter quests based on search query and category
     const filterQuest = (q: Quest) => {
         if (searchQuery.trim()) {
-            const name = q.config.messages?.questName?.toLowerCase() || "";
+            const name = getQuestName(q).toLowerCase();
             if (!name.includes(searchQuery.toLowerCase().trim())) return false;
         }
 
@@ -94,7 +97,8 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
             const info = getTaskInfo(q);
             return (info.name?.includes("PLAY") || info.name?.includes("STREAM") || info.name?.includes("ACTIVITY")) ?? false;
         } else if (filterCategory === "expiring") {
-            const remaining = new Date(q.config.expiresAt).getTime() - Date.now();
+            const expiresAt = getQuestExpiresAt(q);
+            const remaining = expiresAt ? new Date(expiresAt).getTime() - Date.now() : 0;
             return remaining > 0 && remaining <= 48 * 60 * 60 * 1000;
         } else if (filterCategory === "orbs") {
             const r = getQuestReward(q);
@@ -123,7 +127,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
         if (!userStats || !userStats.history) return;
         const codes = userStats.history.filter(h => h.code);
         if (codes.length === 0) {
-            showToast("No promo codes found to export.", Toasts.Type.MESSAGE);
+            showToast({ text: "No promo codes found to export." });
             return;
         }
 
@@ -145,10 +149,23 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
 
     const copyCode = (code: string) => {
         navigator.clipboard.writeText(code).then(() => {
-            showToast("Code copied to clipboard! 📋", Toasts.Type.SUCCESS);
+            showToast({ text: "Code copied to clipboard! 📋", variant: "success" });
         }).catch(() => {
-            showToast("Failed to copy code.", Toasts.Type.FAILURE);
+            showToast({ text: "Failed to copy code.", variant: "critical" });
         });
+    };
+
+    const handleQuickRedeem = (code: string, questName: string, rewardName: string) => {
+        const info = getRedeemInfo(code, questName, rewardName);
+        if (!info) return;
+
+        navigator.clipboard.writeText(code).then(() => {
+            showToast({ text: `Code copied! Opening ${info.platform}... 🚀`, variant: "success" });
+        }).catch(() => {
+            showToast({ text: `Opening ${info.platform}... 🚀` });
+        });
+
+        window.open(info.url, "_blank");
     };
 
     const toggleCodeUsed = async (questId: string, currentUsed: boolean) => {
@@ -278,7 +295,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                 </div>
                                 <h2 className="vc-quest-hero-title">
                                     {currentQuest
-                                        ? currentQuest.config.messages.questName
+                                        ? getQuestName(currentQuest)
                                         : "System Ready"}
                                 </h2>
                                 <p className="vc-quest-hero-subtitle">
@@ -368,6 +385,15 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         >
                             📊 Analytics & Stats
                         </div>
+                        {settings.store.debugMode && (
+                            <div
+                                className={`vc-quest-tab ${activeTab === "debug" ? "active" : ""}`}
+                                onClick={() => setActiveTab("debug")}
+                                style={{ color: activeTab === "debug" ? "#f38ba8" : undefined }}
+                            >
+                                🐛 Debug
+                            </div>
+                        )}
                     </div>
 
                     {/* Quests View */}
@@ -413,7 +439,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                         if (isOutdated) applyUpdate();
                                         else {
                                             checkForUpdates().then((outdated: boolean) => {
-                                                if (!outdated) showToast("You are on the latest version!", Toasts.Type.SUCCESS);
+                                                if (!outdated) showToast({ text: "You are on the latest version!", variant: "success" });
                                                 else applyUpdate();
                                             });
                                         }
@@ -500,7 +526,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                     style={{ cursor: "pointer" }}
                                                     onClick={() => enrollQuest(q).then(refresh)}
                                                 >
-                                                    <span className="vc-quest-list-item-name">{q.config.messages.questName}</span>
+                                                    <span className="vc-quest-list-item-name">{getQuestName(q)}</span>
                                                     <span className="vc-quest-list-item-type">Enroll</span>
                                                 </div>
                                             ))
@@ -568,7 +594,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                     style={{ borderColor: "var(--brand-experiment)", cursor: "pointer" }}
                                                     onClick={() => claimQuestReward(q).then(refresh)}
                                                 >
-                                                    <span className="vc-quest-list-item-name">🎁 {q.config.messages.questName}</span>
+                                                    <span className="vc-quest-list-item-name">🎁 {getQuestName(q)}</span>
                                                     <span className="vc-quest-list-item-type" style={{ background: "var(--brand-experiment)", color: "#fff" }}>
                                                         Claim Reward
                                                     </span>
@@ -657,6 +683,20 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                                         📋 Copy
                                                     </ButtonCompat>
                                                 )}
+                                                {h.code && (() => {
+                                                    const redeem = getRedeemInfo(h.code, h.name, h.rewardName);
+                                                    if (!redeem) return null;
+                                                    return (
+                                                        <ButtonCompat
+                                                            color={ButtonCompat.Colors.GREEN}
+                                                            size={ButtonCompat.Sizes.SMALL}
+                                                            onClick={() => handleQuickRedeem(h.code!, h.name, h.rewardName)}
+                                                            title={`Copy code & open ${redeem.platform} redemption page`}
+                                                        >
+                                                            🚀 {redeem.label}
+                                                        </ButtonCompat>
+                                                    );
+                                                })()}
                                                 {h.code && (
                                                     <ButtonCompat
                                                         color={h.codeUsed ? ButtonCompat.Colors.PRIMARY : ButtonCompat.Colors.GREEN}
@@ -806,6 +846,11 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {/* Developer Debug View */}
+                    {activeTab === "debug" && (
+                        <DebugView />
                     )}
                 </div>
             </ModalContentCmp>

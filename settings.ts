@@ -52,6 +52,11 @@ export const settings = definePluginSettings({
         description: "Hide completed quests from the Quest Manager modal.",
         default: false
     },
+    playCompletionSound: {
+        type: OptionType.BOOLEAN,
+        description: "Play a celebratory chime sound when a quest is completed.",
+        default: true
+    },
     enableVideoQuests: {
         type: OptionType.BOOLEAN,
         description: "Enable watching video quests.",
@@ -142,5 +147,10 @@ export const settings = definePluginSettings({
         default: 24,
         markers: [1, 6, 12, 24, 48],
         stickToMarkers: false
+    },
+    debugMode: {
+        type: OptionType.BOOLEAN,
+        description: "Enable developer Debug Mode (adds a Debug tab in Quest Manager for inspecting raw API payloads, store states, and live logs).",
+        default: false
     }
 });

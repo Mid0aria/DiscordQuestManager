@@ -25,35 +25,65 @@ export interface QuestTaskInfo {
 export interface QuestTaskConfigEntry {
     target: number;
     applications?: { id: string; }[];
+    type?: string;
+    assets?: any;
+    messages?: any;
 }
 
 export interface QuestConfig {
-    expiresAt: string;
+    expiresAt?: string;
+    expires_at?: string;
     application?: {
         id: string;
         name?: string;
+        link?: string;
     };
     messages: {
-        questName: string;
+        questName?: string;
+        quest_name?: string;
+        gameTitle?: string;
+        game_title?: string;
+        gamePublisher?: string;
+        game_publisher?: string;
+        rewardName?: string;
+        reward_name?: string;
     };
     taskConfig?: { tasks: Record<string, QuestTaskConfigEntry | null>; };
-    taskConfigV2?: { tasks: Record<string, QuestTaskConfigEntry | null>; };
+    taskConfigV2?: { tasks: Record<string, QuestTaskConfigEntry | null>; join_operator?: string; };
+    task_config_v2?: { tasks: Record<string, QuestTaskConfigEntry | null>; join_operator?: string; };
+    task_config?: { tasks: Record<string, QuestTaskConfigEntry | null>; };
     configVersion?: number;
-    rewards?: { messages?: { name: string, nameWithArticle?: string; }; orbQuantity?: number; }[];
+    config_version?: number;
+    rewards?: any[];
+    rewardsConfig?: any;
+    rewards_config?: any;
 }
 
 export interface QuestUserStatus {
     enrolledAt?: string;
+    enrolled_at?: string;
     completedAt?: string;
+    completed_at?: string;
     claimedAt?: string;
-    progress?: Record<string, { value: number; }>;
+    claimed_at?: string;
+    progress?: Record<string, {
+        value: number;
+        event_name?: string;
+        updated_at?: string;
+        completed_at?: string;
+        heartbeat?: any;
+    }>;
     streamProgressSeconds?: number;
+    stream_progress_seconds?: number;
+    orbQuantityClaimed?: number;
+    orb_quantity_claimed?: number;
 }
 
 export interface Quest {
     id: string;
     config: QuestConfig;
     userStatus?: QuestUserStatus;
+    user_status?: QuestUserStatus;
     isTargeted?: boolean;
     is_targeted?: boolean;
     trafficMetadata?: any;

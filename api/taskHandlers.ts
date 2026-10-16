@@ -6,7 +6,7 @@
 
 import { FluxDispatcher, RestAPI } from "@webpack/common";
 
-import { getTaskApplicationId } from "./questApi";
+import { getQuestName, getTaskApplicationId } from "./questApi";
 import { withRetry } from "../core/http";
 import { AppState, isRunning, log, sleep } from "../core/state";
 import { ChannelStore, GuildChannelStore, RunningGameStore, StreamingStore } from "../core/stores";
@@ -17,7 +17,8 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
     const baseSpeed = settings.store.videoSpeed;
     const randomize = settings.store.randomizeProgress;
     let current = taskInfo.progress;
-    log(`Started video task: ${quest.config.messages.questName}`, "info", true);
+    const questName = getQuestName(quest);
+    log(`Started video task: ${questName}`, "info", true);
 
     while (current < taskInfo.target && isRunning && !AppState.skipRequested) {
         await AppState.pauseManager.waitIfPaused();
@@ -49,7 +50,7 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
             body: { timestamp: current + (randomize ? Math.random() * 0.5 : 0) }
         }));
 
-        if ((res.body as any).completed_at) break;
+        if ((res.body as any)?.completed_at || (res.body as any)?.user_status?.completed_at) break;
     }
 
     if (isRunning && !AppState.skipRequested) {
@@ -66,14 +67,15 @@ export async function spoofDispatcherEvent(
     taskInfo: QuestTaskInfo,
     spooferSetup: () => () => void
 ): Promise<void> {
+    const questName = getQuestName(quest);
     if (typeof (window as any).DiscordNative === "undefined") {
-        log(`This task cannot be done in browser: ${quest.config.messages.questName}`, "error", true);
+        log(`This task cannot be done in browser: ${questName}`, "error", true);
         throw new Error("Requires desktop app.");
     }
 
     const cleanup = spooferSetup();
     const remaining = Math.ceil((taskInfo.target - taskInfo.progress) / 60);
-    log(`Detected ${quest.config.messages.questName}. Estimated time: ${remaining} minutes...`, "warn", true);
+    log(`Detected ${questName}. Estimated time: ${remaining} minutes...`, "warn", true);
 
     AppState.nextHeartbeatTime = Date.now() + 60000;
 
@@ -90,9 +92,11 @@ export async function spoofDispatcherEvent(
 
             AppState.nextHeartbeatTime = Date.now() + 60000;
 
-            const progress = quest.config.configVersion === 1
-                ? data.userStatus.streamProgressSeconds
-                : Math.floor(data.userStatus.progress[taskInfo.name!].value);
+            const configVersion = quest.config.configVersion ?? quest.config.config_version ?? (quest.config as any)?.configVersion ?? 2;
+            const status = data?.userStatus ?? data?.user_status;
+            const progress = configVersion === 1
+                ? (status?.streamProgressSeconds ?? status?.stream_progress_seconds ?? 0)
+                : Math.floor(status?.progress?.[taskInfo.name!]?.value ?? 0);
 
             if (progress >= taskInfo.target) finish();
         };
@@ -116,13 +120,18 @@ export async function spoofDispatcherEvent(
 }
 
 export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
+    const questName = getQuestName(quest);
     const appId = getTaskApplicationId(quest, taskInfo.name!);
     if (!appId) {
-        log(`Could not determine application ID for: ${quest.config.messages.questName}`, "error", true);
+        log(`Could not determine application ID for: ${questName}`, "error", true);
         throw new Error("Missing application ID.");
     }
     const res = await withRetry(() => RestAPI.get({ url: `/applications/public?application_ids=${appId}` }));
-    const appData = (res.body as any[])[0];
+    const appData = (res.body as any[])?.[0];
+    if (!appData) {
+        log(`Application data not found for: ${questName} (App ID: ${appId})`, "error", true);
+        throw new Error(`Application data not found for ID: ${appId}`);
+    }
     const platform = (window as any).DiscordNative?.process?.platform ?? "win32";
     const exeName = appData.executables?.find((x: any) => x.os === platform)?.name?.replace(">", "")
         ?? appData.executables?.find((x: any) => x.os === "win32")?.name?.replace(">", "")
@@ -172,9 +181,10 @@ export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promis
 }
 
 export async function streamDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
+    const questName = getQuestName(quest);
     const appId = getTaskApplicationId(quest, taskInfo.name!);
     if (!appId) {
-        log(`Could not determine application ID for: ${quest.config.messages.questName}`, "error", true);
+        log(`Could not determine application ID for: ${questName}`, "error", true);
         throw new Error("Missing application ID.");
     }
     const originalFunc = StreamingStore.getStreamerActiveStreamMetadata;
@@ -198,13 +208,14 @@ export async function streamDesktop(quest: Quest, taskInfo: QuestTaskInfo): Prom
 }
 
 export async function playActivity(quest: Quest, taskInfo: QuestTaskInfo): Promise<void> {
+    const questName = getQuestName(quest);
     const channelId =
         ChannelStore.getSortedPrivateChannels()[0]?.id ??
         (Object.values(GuildChannelStore.getAllGuilds()) as any[]).find(x => x?.VOCAL?.length > 0)?.VOCAL[0].channel.id;
     const streamKey = `call:${channelId}:1`;
     let current = taskInfo.progress;
 
-    log(`Started activity task: ${quest.config.messages.questName}`, "info", true);
+    log(`Started activity task: ${questName}`, "info", true);
 
     while (current < taskInfo.target && isRunning && !AppState.skipRequested) {
         await AppState.pauseManager.waitIfPaused();

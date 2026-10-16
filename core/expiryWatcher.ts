@@ -6,7 +6,7 @@
 
 import { showNotification } from "@api/Notifications";
 
-import { getAllQuests } from "../api/questApi";
+import { getAllQuests, getQuestExpiresAt, getQuestName } from "../api/questApi";
 import { settings } from "../settings";
 import { log } from "./state";
 
@@ -22,15 +22,18 @@ function checkExpiringQuests() {
     const now = Date.now();
 
     for (const quest of getAllQuests()) {
-        if (quest.userStatus?.completedAt) continue;
+        const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
+        if (status?.completedAt || status?.completed_at) continue;
         if (warnedQuestIds.has(quest.id)) continue;
 
-        const remaining = new Date(quest.config.expiresAt).getTime() - now;
-        if (remaining <= 0 || remaining > thresholdMs) continue;
+        const expiresAt = getQuestExpiresAt(quest);
+        if (!expiresAt) continue;
+        const remaining = new Date(expiresAt).getTime() - now;
+        if (isNaN(remaining) || remaining <= 0 || remaining > thresholdMs) continue;
 
         warnedQuestIds.add(quest.id);
         const hoursLeft = Math.max(1, Math.round(remaining / (60 * 60 * 1000)));
-        const name = quest.config.messages.questName;
+        const name = getQuestName(quest);
 
         log(`Quest expiring soon: ${name} (~${hoursLeft}h left)`, "warn", true);
         showNotification?.({

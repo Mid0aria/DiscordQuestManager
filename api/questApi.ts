@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { NavigationRouter, RestAPI } from "@webpack/common";
+import { RestAPI } from "@webpack/common";
 
 import { addQuestToHistory } from "../core/db";
 import { withRetry } from "../core/http";
@@ -13,49 +13,86 @@ import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
 import { Quest, QuestTaskInfo, SUPPORTED_TASKS, SupportedTask } from "../types";
 
+export function getQuestName(quest: Quest): string {
+    return quest.config?.messages?.questName ||
+        quest.config?.messages?.quest_name ||
+        quest.config?.messages?.gameTitle ||
+        quest.config?.messages?.game_title ||
+        "Unknown Quest";
+}
+
+export function getQuestExpiresAt(quest: Quest): string {
+    return quest.config?.expiresAt ||
+        quest.config?.expires_at ||
+        "";
+}
+
 export function getTaskInfo(quest: Quest): QuestTaskInfo {
-    const config = quest.config.taskConfig ?? quest.config.taskConfigV2;
+    const rawConfig = quest.config as any;
+    const config = rawConfig?.taskConfig ?? rawConfig?.taskConfigV2 ?? rawConfig?.task_config_v2 ?? rawConfig?.task_config;
+    const rawStatus = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
     const taskName = SUPPORTED_TASKS.find(t => config?.tasks?.[t] != null);
     return {
         name: taskName,
         target: (taskName && config?.tasks?.[taskName]?.target) || 0,
-        progress: (taskName && quest.userStatus?.progress?.[taskName]?.value) || 0
+        progress: (taskName && rawStatus?.progress?.[taskName]?.value) || 0
     };
 }
 
 export function getTaskApplicationId(quest: Quest, taskName: SupportedTask): string | undefined {
-    const config = quest.config.taskConfig ?? quest.config.taskConfigV2;
-    return config?.tasks?.[taskName]?.applications?.[0]?.id ?? quest.config.application?.id;
+    const rawConfig = quest.config as any;
+    const config = rawConfig?.taskConfig ?? rawConfig?.taskConfigV2 ?? rawConfig?.task_config_v2 ?? rawConfig?.task_config;
+    return config?.tasks?.[taskName]?.applications?.[0]?.id ?? quest.config?.application?.id;
 }
 
 export function getQuestReward(quest: Quest): { name: string, orbs: number; } {
     let name = "Unknown Reward";
     let orbs = 0;
 
-    const rewards = quest.config?.rewards || (quest.config as any)?.rewardsConfig?.rewards || (quest as any)?.rewards;
+    const rewards = quest.config?.rewards ||
+        (quest.config as any)?.rewardsConfig?.rewards ||
+        (quest.config as any)?.rewards_config?.rewards ||
+        (quest as any)?.rewardsConfig?.rewards ||
+        (quest as any)?.rewards_config?.rewards ||
+        (quest as any)?.rewards;
 
     if (rewards && rewards.length > 0) {
-        name = rewards[0].messages?.name || rewards[0].name || name;
-        if (rewards[0].orbQuantity) {
-            orbs = rewards[0].orbQuantity;
+        const first = rewards[0];
+        name = first.messages?.nameWithArticle ||
+            first.messages?.name_with_article ||
+            first.messages?.name ||
+            first.name ||
+            name;
+        if (first.premiumOrbQuantity || first.premium_orb_quantity || first.orbQuantity || first.orb_quantity) {
+            orbs = first.premiumOrbQuantity || first.premium_orb_quantity || first.orbQuantity || first.orb_quantity || 0;
         }
-    } else if ((quest.config as any)?.messages?.rewardName) {
-        name = (quest.config as any).messages.rewardName;
-    }
-
-    if (name === "Unknown Reward") {
-        console.warn("[QuestManager] Could not determine reward for quest:", quest.config?.messages?.questName, quest);
+    } else if ((quest.config as any)?.messages?.rewardName || (quest.config as any)?.messages?.reward_name) {
+        name = (quest.config as any).messages.rewardName || (quest.config as any).messages.reward_name;
     }
 
     if (!orbs) {
-        // Prefer the structured claimed-quantity field over the regex fallback below,
-        // since that regex only matches English reward text and silently returns 0
-        // orbs on non-English Discord locales.
-        if (quest.userStatus && (quest.userStatus as any).orbQuantityClaimed) {
-            orbs = (quest.userStatus as any).orbQuantityClaimed;
+        orbs = (quest.config as any)?.rewardsConfig?.orbQuantity ||
+            (quest.config as any)?.rewards_config?.orb_quantity ||
+            (quest.config as any)?.rewardsConfig?.premiumOrbQuantity ||
+            (quest.config as any)?.rewards_config?.premium_orb_quantity ||
+            (quest.config as any)?.orbQuantity ||
+            (quest.config as any)?.orb_quantity ||
+            (quest.userStatus as any)?.orbQuantityClaimed ||
+            (quest.user_status as any)?.orb_quantity_claimed ||
+            (quest as any)?.user_status?.orb_quantity_claimed ||
+            0;
+    }
+
+    if (!orbs) {
+        const orbMatch = name.match(/(\d+)\s*orb/i);
+        if (orbMatch) orbs = parseInt(orbMatch[1], 10);
+    }
+
+    if (name === "Unknown Reward") {
+        if (orbs > 0) {
+            name = `${orbs} Discord Orbs`;
         } else {
-            const orbMatch = name.match(/(\d+)\s*orb/i);
-            if (orbMatch) orbs = parseInt(orbMatch[1], 10);
+            console.warn("[QuestManager] Could not determine reward for quest:", getQuestName(quest), quest);
         }
     }
 
@@ -74,7 +111,7 @@ export function sortQuests(quests: Quest[]): Quest[] {
             const isActB = getTaskInfo(b).name?.includes("ACTIVITY") ? 1 : 0;
             return isActB - isActA;
         } else {
-            return new Date(a.config.expiresAt).getTime() - new Date(b.config.expiresAt).getTime();
+            return new Date(getQuestExpiresAt(a)).getTime() - new Date(getQuestExpiresAt(b)).getTime();
         }
     });
 }
@@ -85,8 +122,13 @@ export function buildQueue(): Quest[] {
     const quests = [...QuestsStore.quests.values()] as Quest[];
     const filtered = quests
         .filter(x => {
-            if (!x.userStatus?.enrolledAt || x.userStatus?.completedAt) return false;
-            if (new Date(x.config.expiresAt).getTime() <= Date.now()) return false;
+            const status = x.userStatus ?? x.user_status ?? (x as any)?.user_status;
+            const enrolledAt = status?.enrolledAt ?? status?.enrolled_at;
+            const completedAt = status?.completedAt ?? status?.completed_at;
+            if (!enrolledAt || completedAt) return false;
+
+            const expiresAt = getQuestExpiresAt(x);
+            if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return false;
 
             const info = getTaskInfo(x);
             if (!info.name) return false;
@@ -104,8 +146,13 @@ export function getUnenrolledQuests(): Quest[] {
     const { store } = settings;
     const quests = [...QuestsStore.quests.values()] as Quest[];
     return quests.filter(x => {
-        if (x.userStatus?.enrolledAt || x.userStatus?.completedAt) return false;
-        if (new Date(x.config.expiresAt).getTime() <= Date.now()) return false;
+        const status = x.userStatus ?? x.user_status ?? (x as any)?.user_status;
+        const enrolledAt = status?.enrolledAt ?? status?.enrolled_at;
+        const completedAt = status?.completedAt ?? status?.completed_at;
+        if (enrolledAt || completedAt) return false;
+
+        const expiresAt = getQuestExpiresAt(x);
+        if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return false;
 
         const info = getTaskInfo(x);
         if (!info.name) return false;
@@ -123,24 +170,43 @@ export function getAllQuests(): Quest[] {
 }
 
 export async function enroll(quest: Quest): Promise<boolean> {
-    if (quest.userStatus?.enrolledAt) return true;
+    const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
+    if (status?.enrolledAt || status?.enrolled_at) return true;
+    const questName = getQuestName(quest);
     try {
-        await withRetry(() => RestAPI.post({
-            url: `/quests/${quest.id}/enroll`,
-            body: {
-                location: 11,
-                is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
-                traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+        if (QuestActions && typeof QuestActions.enrollInQuest === "function") {
+            try {
+                await QuestActions.enrollInQuest(quest.id, { location: 11, platform: 0 });
+            } catch {
+                await withRetry(() => RestAPI.post({
+                    url: `/quests/${quest.id}/enroll`,
+                    body: {
+                        location: 11,
+                        platform: 0,
+                        is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
+                        traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+                    }
+                }));
             }
-        }));
-        log(`Enrolled: ${quest.config.messages.questName}`, "success", true);
+        } else {
+            await withRetry(() => RestAPI.post({
+                url: `/quests/${quest.id}/enroll`,
+                body: {
+                    location: 11,
+                    platform: 0,
+                    is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
+                    traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+                }
+            }));
+        }
+        log(`Enrolled: ${questName}`, "success", true);
         quest.userStatus = quest.userStatus || {};
         quest.userStatus.enrolledAt = new Date().toISOString();
         await sleep(1500);
         return true;
     } catch (e) {
         console.error("[QuestManager]", e);
-        log(`Enrollment failed: ${quest.config.messages.questName}`, "error", true);
+        log(`Enrollment failed: ${questName}`, "error", true);
         return false;
     }
 }
@@ -200,9 +266,10 @@ export async function claimQuestReward(quest: Quest): Promise<{ success: boolean
 
         const reward = getQuestReward(quest);
         const taskInfo = getTaskInfo(quest);
+        const questName = getQuestName(quest);
         await addQuestToHistory(
             quest.id,
-            quest.config.messages.questName,
+            questName,
             reward.name,
             reward.orbs,
             code,
@@ -212,15 +279,12 @@ export async function claimQuestReward(quest: Quest): Promise<{ success: boolean
         if (code) {
             log(`Reward claimed! Promo code saved: ${code} 🎁`, "success", true);
         } else {
-            log(`Claim triggered: ${quest.config.messages.questName}`, "success", true);
+            log(`Claim triggered: ${questName}`, "success", true);
         }
         return { success: true, code };
     } catch (e) {
         console.error("[QuestManager]", e);
-        log("Failed to claim reward. Redirecting for manual claim...", "warn", true);
-        try {
-            NavigationRouter.transitionTo("/quest-home");
-        } catch { }
+        log("Failed to claim reward.", "warn", true);
         return { success: false };
     }
 }

@@ -6,7 +6,7 @@
 
 import { React } from "@webpack/common";
 
-import { calculateQuestETA, formatETA, getQuestReward, getTaskInfo } from "../api/questApi";
+import { calculateQuestETA, formatETA, getQuestName, getQuestReward, getTaskInfo } from "../api/questApi";
 import { ORB_ICON_URL, Quest } from "../types";
 
 interface QuestListItemProps {
@@ -29,7 +29,7 @@ export function QuestListItem({ quest, isActive, onRemove, onMoveUp, onMoveDown,
         <div className={`vc-quest-list-item ${isActive ? "active" : ""}`}>
             <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: 0, flex: 1 }}>
                 <span className="vc-quest-list-item-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {quest.config.messages.questName}
+                    {getQuestName(quest)}
                 </span>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "12px", color: "var(--text-muted)" }}>
                     <span style={{ display: "flex", gap: "5px", alignItems: "center" }}>

@@ -8,7 +8,7 @@ import * as DataStore from "@api/DataStore";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { createRoot, React, useEffect, useRef, useState } from "@webpack/common";
 
-import { calculateTotalQueueETA, formatETA, getTaskInfo } from "../api/questApi";
+import { calculateTotalQueueETA, formatETA, getQuestName, getTaskInfo } from "../api/questApi";
 import { AppState, isRunning } from "../core/state";
 import { QuestsStore } from "../core/stores";
 import { pauseWorker, resumeWorker, runWorker, skipCurrentQuest } from "../core/worker";
@@ -167,7 +167,7 @@ export function QuestOverlay() {
                 <GripIcon />
                 <StatusIcon status={workerStatus} />
                 <span className="vc-quest-pill-title">
-                    {currentQuest ? currentQuest.config.messages.questName : "Idle"}
+                    {currentQuest ? getQuestName(currentQuest) : "Idle"}
                 </span>
                 {currentQuest && (
                     <span className="vc-quest-pill-pct">{pct}%</span>
@@ -239,7 +239,7 @@ export function QuestOverlay() {
                 <>
                     {currentQuest && currentInfo ? (
                         <div className="vc-quest-overlay-body">
-                            <div className="vc-quest-overlay-name">{currentQuest.config.messages.questName}</div>
+                            <div className="vc-quest-overlay-name">{getQuestName(currentQuest)}</div>
                             <ProgressBar progress={currentInfo.progress} target={currentInfo.target} compact={true} />
                         </div>
                     ) : (

@@ -6,10 +6,11 @@
 
 import { SelectedChannelStore } from "@webpack/common";
 
-import { buildQueue, claimQuestReward, enroll, getTaskInfo, getUnenrolledQuests, sortQuests } from "../api/questApi";
+import { buildQueue, claimQuestReward, enroll, getQuestName, getTaskInfo, getUnenrolledQuests, sortQuests } from "../api/questApi";
 import { playActivity, playDesktop, streamDesktop, watchVideo } from "../api/taskHandlers";
 import { settings } from "../settings";
 import { Quest } from "../types";
+import { playQuestCompleteSound } from "../utils/sound";
 import { AppState, isRunning, log, setRunning } from "./state";
 import { IdleStore, QuestsStore, RunningGameStore, StreamingStore } from "./stores";
 
@@ -85,7 +86,9 @@ export async function runWorker(): Promise<void> {
 
                 // skipCurrentQuest() already logged the skip; nothing left to do for this quest.
                 if (isRunning && !AppState.skipRequested) {
-                    log(`Congratulations! ${quest.config.messages.questName} completed! 🎉`, "success", true);
+                    const questName = getQuestName(quest);
+                    log(`Congratulations! ${questName} completed! 🎉`, "success", true);
+                    playQuestCompleteSound();
                     if (settings.store.autoClaimRewards) {
                         await claimQuestReward(quest);
                     }
@@ -104,15 +107,16 @@ export async function runWorker(): Promise<void> {
             }
         } catch (e) {
             console.error("[QuestManager]", e);
-            log(`Error: ${quest.config?.messages?.questName} failed.`, "error", true);
+            const questName = quest ? getQuestName(quest) : "Unknown Quest";
+            log(`Error: ${questName} failed.`, "error", true);
 
             if (settings.store.autoRequeueFailed && isRunning) {
                 quest._retryCount = (quest._retryCount || 0) + 1;
                 if (quest._retryCount <= 2) {
-                    log(`Requeueing "${quest.config?.messages?.questName}" to retry later (Attempt ${quest._retryCount}/2)...`, "warn", true);
+                    log(`Requeueing "${questName}" to retry later (Attempt ${quest._retryCount}/2)...`, "warn", true);
                     AppState.queue.push(quest);
                 } else {
-                    log(`Max retries reached for "${quest.config?.messages?.questName}". Skipping.`, "error", true);
+                    log(`Max retries reached for "${questName}". Skipping.`, "error", true);
                 }
             }
         }
@@ -147,7 +151,7 @@ export function skipCurrentQuest() {
     if (!AppState.currentQuest) return;
     AppState.skipRequested = true;
     if (AppState.spoofers.cancelActiveTask) AppState.spoofers.cancelActiveTask();
-    log(`Skipped: ${AppState.currentQuest.config.messages.questName}`, "warn", true);
+    log(`Skipped: ${getQuestName(AppState.currentQuest)}`, "warn", true);
 }
 
 export async function enrollQuest(quest: Quest): Promise<boolean> {
