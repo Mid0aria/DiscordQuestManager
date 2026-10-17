@@ -73,11 +73,18 @@ function hasConflict(): { conflict: boolean; reason?: string } {
  * 3. Checks if quest is unenrolled and valid for enrollment.
  * 4. Auto-enrolls if enabled, observing rate-limits and adding delays.
  */
+const enrolledQuestIds = new Set<string>();
+
 async function processDiscoveredQuests(
     fetchedQuests: Quest[],
     sourceLabel: string,
     isVpn = false
 ): Promise<{ found: number; enrolled: number }> {
+    if (isCurrentlyRateLimited()) {
+        log(`⚠️ [Quest Scanner] Skipping enrollment: Discord REST rate limit is active.`, "warn", true);
+        return { found: 0, enrolled: 0 };
+    }
+
     let found = 0;
     let enrolled = 0;
 
@@ -89,37 +96,41 @@ async function processDiscoveredQuests(
         const isCompleted = !!(status?.completedAt || status?.completed_at);
         if (isCompleted) continue;
 
-        const isEnrolled = !!(status?.enrolledAt || status?.enrolled_at);
-        if (!isEnrolled) {
-            // Check if valid according to user settings and task eligibility
-            if (!isQuestValidForEnrollment(q)) continue;
+        const isStoreEnrolled = !!(QuestsStore?.quests?.get(q.id)?.userStatus?.enrolledAt || (QuestsStore?.quests?.get(q.id) as any)?.user_status?.enrolled_at);
+        const isAlreadyQueued = AppState.queue.some(queued => queued.id === q.id);
+        const isEnrolled = !!(status?.enrolledAt || status?.enrolled_at) || isStoreEnrolled || isAlreadyQueued || enrolledQuestIds.has(q.id);
+        if (isEnrolled) continue;
 
-            found++;
+        // Check if valid according to user settings and task eligibility
+        if (!isQuestValidForEnrollment(q)) continue;
 
-            if (settings.store.autoEnrollNewQuests) {
-                if (isCurrentlyRateLimited()) {
-                    log(`⚠️ [Quest Scanner] Skipping enrollment: Discord REST rate limit is active.`, "warn", true);
-                    break;
-                }
+        found++;
 
-                const prefix = isVpn ? "🌍 [VPN Scanner]" : "🎯 [Quest Scanner]";
-                log(`${prefix} Discovered new quest: "${getQuestName(q)}" (${sourceLabel})! Enrolling...`, "info", true);
-
-                const ok = await enroll(q);
-                if (ok) {
-                    enrolled++;
-                    const questToQueue = QuestsStore?.quests?.get(q.id) ?? q;
-                    if (!AppState.queue.some(queued => queued.id === q.id)) {
-                        AppState.queue.push(questToQueue);
-                    }
-                } else if (isCurrentlyRateLimited()) {
-                    log(`⚠️ [Quest Scanner] Enrollment paused: Hit Discord rate limit (429).`, "warn", true);
-                    break;
-                }
-
-                // Generous throttle between consecutive enrollments to avoid 429
-                await sleep(1500);
+        if (settings.store.autoEnrollNewQuests) {
+            if (isCurrentlyRateLimited()) {
+                log(`⚠️ [Quest Scanner] Skipping enrollment: Discord REST rate limit is active.`, "warn", true);
+                break;
             }
+
+            const prefix = isVpn ? "🌍 [VPN Scanner]" : "🎯 [Quest Scanner]";
+            log(`${prefix} Discovered new quest: "${getQuestName(q)}" (${sourceLabel})! Enrolling...`, "info", true);
+
+            const ok = await enroll(q);
+            if (ok) {
+                enrolled++;
+                enrolledQuestIds.add(q.id);
+                const questToQueue = QuestsStore?.quests?.get(q.id) ?? q;
+                if (!AppState.queue.some(queued => queued.id === q.id)) {
+                    AppState.queue.push(questToQueue);
+                }
+            } else if (isCurrentlyRateLimited()) {
+                log(`⚠️ [Quest Scanner] Enrollment paused: Hit Discord rate limit (429).`, "warn", true);
+                break;
+            }
+
+            // Throttle between consecutive enrollments to prevent Discord 429 rate limits
+            const throttleSec = Math.max(1, settings.store.enrollThrottleSec ?? 3);
+            await sleep(throttleSec * 1000);
         }
     }
 
@@ -257,9 +268,10 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
                             };
 
                         try {
-                            await vpnClient.connect(region, 25);
+                            const connectTimeout = Math.max(10, settings.store.vpnConnectTimeoutSec ?? 25);
+                            await vpnClient.connect(region, connectTimeout);
 
-                            const cooldownSec = Math.max(2, settings.store.vpnCooldownSec ?? 6);
+                            const cooldownSec = Math.max(2, settings.store.vpnCooldownSec ?? 10);
                             debugLog(`[VPN Scanner] Waiting ${cooldownSec}s cooldown for IP propagation...`);
                             await sleep(cooldownSec * 1000);
 
@@ -282,6 +294,15 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
                                     // ignore
                                 }
                             }
+
+                            if (isCurrentlyRateLimited()) {
+                                const sec = getRemainingRateLimitSec();
+                                const mins = Math.ceil(sec / 60);
+                                const timeStr = sec > 60 ? `~${mins} min (${sec}s)` : `${sec}s`;
+                                log(`⚠️ [VPN Scanner] Discord rate limit triggered. Aborting remaining regions (${timeStr} remaining).`, "warn", true);
+                                lastResults.push(regionSummary);
+                                break;
+                            }
                         } catch (err: any) {
                             const errMsg = err?.message || String(err);
                             regionSummary.error = errMsg;
@@ -293,17 +314,18 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
 
                     // Restore previous VPN state or disconnect
                     if (settings.store.vpnDisconnectAfterScan) {
+                        const restoreTimeout = Math.max(10, settings.store.vpnConnectTimeoutSec ?? 25);
                         if (initialVpnState.toLowerCase() === "connected" && initialVpnRegion) {
                             log(`🌍 [VPN Scanner] Restoring original ExpressVPN region: '${initialVpnRegion}'...`, "info");
                             try {
-                                await vpnClient.connect(initialVpnRegion, 25);
+                                await vpnClient.connect(initialVpnRegion, restoreTimeout);
                             } catch (e) {
                                 debugLog("[VPN Scanner] Failed to restore original VPN region:", e);
                             }
                         } else {
                             log("🌍 [VPN Scanner] Disconnecting ExpressVPN tunnel...", "info");
                             try {
-                                await vpnClient.disconnect(15);
+                                await vpnClient.disconnect(restoreTimeout);
                             } catch (e) {
                                 debugLog("[VPN Scanner] Failed to disconnect VPN:", e);
                             }
@@ -363,12 +385,13 @@ export function startVpnScanner(): void {
 
     debugLog(`[Quest Scanner] Scheduled background quest scan every ${hours} hours.`);
 
-    // Delay initial scan by 20s to let Discord and plugins settle
+    // Delay initial scan to let Discord and plugins settle (configurable)
+    const initialDelaySec = Math.max(5, settings.store.initialScanDelaySec ?? 20);
     setTimeout(() => {
         if (settings.store.autoScanNewQuests && isRunning) {
             scanRegionsNow();
         }
-    }, 20000);
+    }, initialDelaySec * 1000);
 
     scanIntervalTimer = setInterval(() => {
         if (settings.store.autoScanNewQuests && isRunning) {

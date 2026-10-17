@@ -51,6 +51,8 @@ Open **Settings > Vencord > Plugins > QuestManager** or configure options direct
 |---|---|:---:|
 | **Auto Scan New Quests** | Periodically scan for newly released Discord quests in the background | `true` |
 | **Scan Interval (Hours)** | Frequency of background quest checks (1h, 2h, 4h, 6h, 12h, 24h) | `4` |
+| **Initial Scan Delay** | Startup delay (in seconds) before the first scan runs after Discord opens | `20s` |
+| **Enrollment Throttle** | Delay (seconds) between consecutive enrollments to prevent 429 rate limits | `3s` |
 | **Auto Enroll New Quests** | Automatically enroll in newly discovered quests found during scans | `true` |
 | **Auto Start On New Quests** | Immediately start worker on newly enrolled quests | `true` |
 | **Auto Start on Launch** | Automatically begin processing incomplete quests when Discord opens | `false` |
@@ -80,7 +82,8 @@ Open **Settings > Vencord > Plugins > QuestManager** or configure options direct
 | **Enable ExpressVPN Scanner** | Multi-country scan for discovering worldwide region-locked quests | `false` |
 | **ExpressVPN MCP URL** | Local MCP endpoint (e.g. `http://127.0.0.1:20090/mcp?token=...`) | Configurable |
 | **Target Regions Picker** | Select which countries/regions to scan via interactive checkboxes | Popular 8 |
-| **VPN Cooldown Delay** | Cooldown (seconds) after switching VPN region before Discord query | `6s` |
+| **VPN Cooldown Delay** | Cooldown (seconds) after switching VPN region before Discord query | `10s` |
+| **VPN Connect Timeout** | Maximum timeout (seconds) to wait for ExpressVPN connection | `25s` |
 | **Disconnect After Scan** | Disconnect or restore previous VPN state when scan finishes | `true` |
 
 ### 🎁 Rewards & Notifications

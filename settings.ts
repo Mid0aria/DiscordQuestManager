@@ -182,6 +182,22 @@ export const settings = definePluginSettings({
         markers: [1, 2, 4, 6, 12, 24],
         stickToMarkers: true,
     },
+    initialScanDelaySec: {
+        type: OptionType.SLIDER,
+        description:
+            "Initial delay (seconds) before running the first background scan after Discord starts.",
+        default: 20,
+        markers: [5, 10, 20, 30, 60],
+        stickToMarkers: true,
+    },
+    enrollThrottleSec: {
+        type: OptionType.SLIDER,
+        description:
+            "Delay (seconds) between consecutive quest enrollments to prevent Discord 429 rate limits.",
+        default: 3,
+        markers: [1, 2, 3, 5, 8, 12],
+        stickToMarkers: true,
+    },
     autoEnrollNewQuests: {
         type: OptionType.BOOLEAN,
         description:
@@ -231,8 +247,16 @@ export const settings = definePluginSettings({
         type: OptionType.SLIDER,
         description:
             "Cooldown delay (seconds) after switching VPN region before querying Discord quests.",
-        default: 6,
-        markers: [3, 5, 8, 12, 15],
+        default: 10,
+        markers: [3, 5, 8, 10, 15, 20, 30],
+        stickToMarkers: true,
+    },
+    vpnConnectTimeoutSec: {
+        type: OptionType.SLIDER,
+        description:
+            "Maximum timeout (seconds) to wait for ExpressVPN to establish a connection to a region.",
+        default: 25,
+        markers: [15, 20, 25, 30, 45],
         stickToMarkers: true,
     },
 });

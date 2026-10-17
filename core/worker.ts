@@ -37,8 +37,15 @@ function isUserActiveWhenIdleOnly(): boolean {
 
 export async function runWorker(): Promise<void> {
     if (AppState.activeWorker) return;
+    if (AppState.queue.length === 0) {
+        log("No quests in queue to process.", "warn", true);
+        return;
+    }
     AppState.activeWorker = true;
+    setRunning(true);
+    AppState.pauseManager.resume();
 
+    let processedCount = 0;
     while (AppState.queue.length > 0 && isRunning) {
         await AppState.pauseManager.waitIfPaused();
 
@@ -70,38 +77,67 @@ export async function runWorker(): Promise<void> {
 
         if (!isRunning) break;
 
-        const quest = AppState.queue.shift()!;
+        const rawQuest = AppState.queue.shift()!;
+        const quest = (QuestsStore?.quests?.get(rawQuest.id) as Quest) ?? rawQuest;
         AppState.currentQuest = quest;
         AppState.skipRequested = false;
 
         try {
             const taskInfo = getTaskInfo(quest);
-            const enrolled = await enroll(quest);
+            const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
+            const isStoreEnrolled = !!(QuestsStore?.quests?.get(quest.id)?.userStatus?.enrolledAt || (QuestsStore?.quests?.get(quest.id) as any)?.user_status?.enrolled_at);
+            let enrolled = !!(status?.enrolledAt || status?.enrolled_at || isStoreEnrolled);
 
-            if (enrolled && taskInfo.name) {
-                if (taskInfo.name.includes("VIDEO")) await watchVideo(quest, taskInfo);
-                else if (taskInfo.name === "PLAY_ON_DESKTOP") await playDesktop(quest, taskInfo);
-                else if (taskInfo.name === "STREAM_ON_DESKTOP") await streamDesktop(quest, taskInfo);
-                else if (taskInfo.name === "PLAY_ACTIVITY") await playActivity(quest, taskInfo);
+            if (!enrolled) {
+                enrolled = await enroll(quest);
+            }
 
-                // skipCurrentQuest() already logged the skip; nothing left to do for this quest.
-                if (isRunning && !AppState.skipRequested) {
-                    const questName = getQuestName(quest);
-                    log(`Congratulations! ${questName} completed! 🎉`, "success", true);
-                    playQuestCompleteSound();
-                    if (settings.store.autoClaimRewards) {
-                        await claimQuestReward(quest);
-                    }
+            if (!enrolled) {
+                const questName = getQuestName(quest);
+                log(`Skipping "${questName}": Quest is not enrolled yet and Discord enrollment rate limit is active.`, "warn", true);
+                continue;
+            }
 
-                    if (AppState.queue.length > 0) {
-                        const delay = settings.store.delayBetweenQuests ?? 0;
-                        if (delay > 0) {
-                            const actualDelay = settings.store.randomizeProgress
-                                ? Math.max(1, Math.round(delay * (0.8 + Math.random() * 0.4)))
-                                : delay;
-                            log(`Waiting ${actualDelay} seconds before starting the next quest...`, "info");
-                            await new Promise(r => setTimeout(r, actualDelay * 1000));
-                        }
+            const isCompleted = !!(status?.completedAt || status?.completed_at);
+            if (isCompleted || (taskInfo.target > 0 && taskInfo.progress >= taskInfo.target)) {
+                const questName = getQuestName(quest);
+                log(`Quest "${questName}" is already completed! Claiming reward if needed...`, "info", true);
+                if (settings.store.autoClaimRewards) {
+                    await claimQuestReward(quest);
+                }
+                continue;
+            }
+
+            if (!taskInfo.name) {
+                const questName = getQuestName(quest);
+                log(`Skipping "${questName}": No supported task found.`, "warn", true);
+                continue;
+            }
+
+            if (taskInfo.name.includes("VIDEO")) await watchVideo(quest, taskInfo);
+            else if (taskInfo.name === "PLAY_ON_DESKTOP") await playDesktop(quest, taskInfo);
+            else if (taskInfo.name === "STREAM_ON_DESKTOP") await streamDesktop(quest, taskInfo);
+            else if (taskInfo.name === "PLAY_ACTIVITY") await playActivity(quest, taskInfo);
+
+            processedCount++;
+
+            // skipCurrentQuest() already logged the skip; nothing left to do for this quest.
+            if (isRunning && !AppState.skipRequested) {
+                const questName = getQuestName(quest);
+                log(`Congratulations! ${questName} completed! 🎉`, "success", true);
+                playQuestCompleteSound();
+                if (settings.store.autoClaimRewards) {
+                    await claimQuestReward(quest);
+                }
+
+                if (AppState.queue.length > 0) {
+                    const delay = settings.store.delayBetweenQuests ?? 0;
+                    if (delay > 0) {
+                        const actualDelay = settings.store.randomizeProgress
+                            ? Math.max(1, Math.round(delay * (0.8 + Math.random() * 0.4)))
+                            : delay;
+                        log(`Waiting ${actualDelay} seconds before starting the next quest...`, "info");
+                        await new Promise(r => setTimeout(r, actualDelay * 1000));
                     }
                 }
             }
@@ -119,14 +155,14 @@ export async function runWorker(): Promise<void> {
                     log(`Max retries reached for "${questName}". Skipping.`, "error", true);
                 }
             }
+        } finally {
+            AppState.currentQuest = null;
+            AppState.skipRequested = false;
         }
-
-        AppState.currentQuest = null;
-        AppState.skipRequested = false;
     }
 
     AppState.activeWorker = false;
-    if (isRunning) log("All queued quests have been processed successfully!", "success", true);
+    if (isRunning && processedCount > 0) log("All queued quests have been processed successfully! 🎉", "success", true);
 }
 
 export function pauseWorker() {

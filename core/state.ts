@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import * as DataStore from "@api/DataStore";
 import { showToast } from "@webpack/common";
 
 import { settings } from "../settings";
@@ -41,10 +42,22 @@ export const setRunning = (v: boolean) => { isRunning = v; };
 
 export const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 
+const RATE_LIMIT_STORAGE_KEY = "QM_RateLimitUntil";
 let rateLimitUntil = 0;
+
+// Restore rate limit from persistent storage on startup
+DataStore.get<number>(RATE_LIMIT_STORAGE_KEY).then(val => {
+    if (typeof val === "number" && val > Date.now()) {
+        rateLimitUntil = val;
+        const sec = Math.ceil((val - Date.now()) / 1000);
+        debugLog(`[QuestManager] Restored active Discord rate limit (~${Math.ceil(sec / 60)} min remaining).`);
+    }
+}).catch(() => {});
+
 export function markRateLimited(retryAfterSec: number = 60) {
     const durationMs = Math.max(5, Math.ceil(retryAfterSec)) * 1000;
     rateLimitUntil = Math.max(rateLimitUntil, Date.now() + durationMs);
+    DataStore.set(RATE_LIMIT_STORAGE_KEY, rateLimitUntil).catch(() => {});
 }
 export function isCurrentlyRateLimited(): boolean {
     return Date.now() < rateLimitUntil;
@@ -54,6 +67,7 @@ export function getRemainingRateLimitSec(): number {
 }
 export function clearRateLimit(): void {
     rateLimitUntil = 0;
+    DataStore.del(RATE_LIMIT_STORAGE_KEY).catch(() => {});
 }
 
 export interface DebugLogEntry {

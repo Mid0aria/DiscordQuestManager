@@ -223,6 +223,11 @@ export function getAllQuests(): Quest[] {
 
 export async function enroll(quest: Quest): Promise<boolean> {
     if (!quest?.id) return false;
+
+    const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
+    const isStoreEnrolled = !!(QuestsStore?.quests?.get(quest.id)?.userStatus?.enrolledAt || (QuestsStore?.quests?.get(quest.id) as any)?.user_status?.enrolled_at);
+    if (status?.enrolledAt || status?.enrolled_at || isStoreEnrolled) return true;
+
     if (isCurrentlyRateLimited()) {
         const remaining = getRemainingRateLimitSec();
         const mins = Math.ceil(remaining / 60);
@@ -231,9 +236,6 @@ export async function enroll(quest: Quest): Promise<boolean> {
         return false;
     }
     if (failedEnrollmentQuestIds.has(quest.id)) return false;
-
-    const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
-    if (status?.enrolledAt || status?.enrolled_at) return true;
 
     const questName = getQuestName(quest);
 
@@ -249,37 +251,31 @@ export async function enroll(quest: Quest): Promise<boolean> {
     }
 
     try {
-        let enrolledOk = false;
-        if (QuestActions && typeof QuestActions.enrollInQuest === "function") {
-            try {
-                await Promise.race([
-                    QuestActions.enrollInQuest(quest.id, { location: 11, platform: 0 }),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("QuestActions timeout")), 4000))
-                ]);
-                enrolledOk = true;
-            } catch (actionErr: any) {
-                if (actionErr?.status === 429) throw actionErr;
-            }
-        }
+        await Promise.race([
+            RestAPI.post({
+                url: `/quests/${quest.id}/enroll`,
+                body: {
+                    location: 11,
+                    platform: 0,
+                    is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
+                    traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
+                }
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("RestAPI timeout")), 8000))
+        ]);
 
-        if (!enrolledOk) {
-            await Promise.race([
-                RestAPI.post({
-                    url: `/quests/${quest.id}/enroll`,
-                    body: {
-                        location: 11,
-                        platform: 0,
-                        is_targeted: quest.isTargeted ?? quest.is_targeted ?? false,
-                        traffic_metadata_sealed: quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null
-                    }
-                }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error("RestAPI timeout")), 6000))
-            ]);
+        if (QuestActions && typeof QuestActions.fetchQuests === "function") {
+            try { QuestActions.fetchQuests(); } catch {}
         }
 
         log(`Enrolled: ${questName}`, "success", true);
         quest.userStatus = quest.userStatus || {};
         quest.userStatus.enrolledAt = new Date().toISOString();
+        const storeQuest = QuestsStore?.quests?.get(quest.id);
+        if (storeQuest) {
+            storeQuest.userStatus = storeQuest.userStatus || {};
+            storeQuest.userStatus.enrolledAt = storeQuest.userStatus.enrolledAt || quest.userStatus.enrolledAt;
+        }
         await sleep(500);
         return true;
     } catch (e: any) {

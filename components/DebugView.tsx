@@ -671,8 +671,16 @@ export function DebugView() {
                                 <span>Every {settings.store.scanIntervalHours || 4} hour(s)</span>
                             </div>
                             <div className="vc-quest-debug-meta-row">
-                                <strong>Cooldown Delay:</strong>
-                                <span>{settings.store.vpnCooldownSec || 6} seconds per region</span>
+                                <strong>Enroll Throttle:</strong>
+                                <span>{settings.store.enrollThrottleSec ?? 3}s delay between quests</span>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>VPN Cooldown:</strong>
+                                <span>{settings.store.vpnCooldownSec ?? 10}s per region</span>
+                            </div>
+                            <div className="vc-quest-debug-meta-row">
+                                <strong>VPN Timeout:</strong>
+                                <span>{settings.store.vpnConnectTimeoutSec ?? 25}s max wait</span>
                             </div>
                             <div className="vc-quest-debug-meta-row">
                                 <strong>Post-Scan Behavior:</strong>
