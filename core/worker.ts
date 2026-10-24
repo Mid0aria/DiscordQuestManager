@@ -224,7 +224,8 @@ export async function enrollAll(): Promise<void> {
         if (!ok && isCurrentlyRateLimited()) {
             break;
         }
-        await new Promise(r => setTimeout(r, 1000));
+        const throttleSec = Math.max(1, settings.store.enrollThrottleSec ?? 3);
+        await new Promise(r => setTimeout(r, throttleSec * 1000));
     }
 }
 

@@ -221,6 +221,8 @@ export function getAllQuests(): Quest[] {
     return [...QuestsStore.quests.values()] as Quest[];
 }
 
+let lastEnrollTimestamp = 0;
+
 export async function enroll(quest: Quest): Promise<boolean> {
     if (!quest?.id) return false;
 
@@ -249,6 +251,17 @@ export async function enroll(quest: Quest): Promise<boolean> {
         debugLog(`[QuestManager] Skipping quest not started yet: "${questName}"`);
         return false;
     }
+
+    // Enforce configured delay between consecutive enrollments to prevent Discord 429 rate limits
+    const throttleSec = Math.max(1, settings.store.enrollThrottleSec ?? 3);
+    const now = Date.now();
+    const elapsed = now - lastEnrollTimestamp;
+    const requiredWaitMs = (throttleSec * 1000) - elapsed;
+    if (requiredWaitMs > 0 && lastEnrollTimestamp > 0) {
+        debugLog(`[QuestManager] Waiting ${Math.ceil(requiredWaitMs / 1000)}s delay before enrolling in "${questName}"...`);
+        await sleep(requiredWaitMs);
+    }
+    lastEnrollTimestamp = Date.now();
 
     try {
         await Promise.race([

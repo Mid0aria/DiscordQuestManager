@@ -22,6 +22,7 @@ import { DebugView } from "./DebugView";
 import { ProgressBar } from "./ProgressBar";
 import { QuestListItem } from "./QuestListItem";
 import { openRegionPickerModal } from "./RegionPickerModal";
+import { SettingsView } from "./SettingsView";
 import { StatusIcon } from "./StatusIcon";
 
 interface QuestManagerModalProps {
@@ -30,7 +31,7 @@ interface QuestManagerModalProps {
 
 export function QuestManagerModal({ props }: QuestManagerModalProps) {
     const [now, setNow] = useState(Date.now());
-    const [activeTab, setActiveTab] = useState<"quests" | "vault" | "stats" | "debug">("quests");
+    const [activeTab, setActiveTab] = useState<"quests" | "vault" | "stats" | "settings" | "debug">("quests");
     const [userStats, setUserStats] = useState<UserStats | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterCategory, setFilterCategory] = useState<"all" | "video" | "activity" | "expiring" | "orbs">("all");
@@ -281,7 +282,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
         >
             <ModalContentCmp
                 className={`vc-quest-modal-content theme-${theme}`}
-                style={{ padding: 0, overflow: "hidden" }}
+                style={{ padding: 0, overflow: "hidden", maxHeight: "88vh", display: "flex", flexDirection: "column" }}
             >
                 <div
                     className={`vc-quest-dashboard theme-${theme}`}
@@ -290,6 +291,10 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         margin: "0 auto",
                         border: "none",
                         borderRadius: 0,
+                        maxHeight: "88vh",
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
                     }}
                 >
                     {/* Hero Header */}
@@ -411,6 +416,12 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         >
                             📊 Analytics & Stats
                         </div>
+                        <div
+                            className={`vc-quest-tab ${activeTab === "settings" ? "active" : ""}`}
+                            onClick={() => setActiveTab("settings")}
+                        >
+                            ⚙️ Settings
+                        </div>
                         {settings.store.debugMode && (
                             <div
                                 className={`vc-quest-tab ${activeTab === "debug" ? "active" : ""}`}
@@ -422,8 +433,10 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         )}
                     </div>
 
-                    {/* Quests View */}
-                    {activeTab === "quests" && (
+                    {/* Dynamic Scrollable Tab Body */}
+                    <div className="vc-quest-tab-body">
+                        {/* Quests View */}
+                        {activeTab === "quests" && (
                         <>
                             {/* Action Bar */}
                             <div className="vc-quest-action-bar">
@@ -769,7 +782,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
 
                     {/* Analytics & Stats View */}
                     {activeTab === "stats" && (
-                        <div className="vc-quest-grid" style={{ gridTemplateColumns: "1fr", padding: "20px" }}>
+                        <div className="vc-quest-grid" style={{ gridTemplateColumns: "1fr", padding: "4px 2px 16px 2px" }}>
                             {userStats && analytics ? (
                                 <>
                                     {/* 4 Metrics Cards */}
@@ -900,10 +913,16 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                         </div>
                     )}
 
+                    {/* In-Modal Settings View */}
+                    {activeTab === "settings" && (
+                        <SettingsView />
+                    )}
+
                     {/* Developer Debug View */}
                     {activeTab === "debug" && (
                         <DebugView />
                     )}
+                    </div>
                 </div>
             </ModalContentCmp>
         </ModalRootCmp>

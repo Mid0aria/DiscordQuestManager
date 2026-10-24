@@ -54,16 +54,26 @@
     }
 }
 
+.vc-quest-modal-content {
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 .vc-quest-dashboard {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    padding: 24px;
+    gap: 16px;
+    padding: 20px 20px 16px 20px;
     background: var(--background-primary);
     border-radius: 16px;
     border: 1px solid var(--background-modifier-accent);
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
     animation: vc-quest-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height: 88vh;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 @keyframes vc-quest-fade-in {
@@ -88,6 +98,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    flex-shrink: 0;
 }
 
 .vc-quest-hero::before {
@@ -338,13 +349,58 @@
     padding-right: 6px;
 }
 
-.vc-quest-list::-webkit-scrollbar {
-    width: 6px;
+/* Custom Discord-Themed Scrollbars */
+.vc-quest-tab-body,
+.vc-quest-list,
+.vc-quest-vault-list,
+.vc-quest-debug-log-list,
+.vc-quest-debug-json-pre,
+.vc-quest-region-list,
+.vc-quest-settings-container {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-auto-thumb, rgba(255, 255, 255, 0.2)) transparent;
 }
 
-.vc-quest-list::-webkit-scrollbar-thumb {
-    background-color: var(--background-tertiary);
-    border-radius: 3px;
+.vc-quest-tab-body::-webkit-scrollbar,
+.vc-quest-list::-webkit-scrollbar,
+.vc-quest-vault-list::-webkit-scrollbar,
+.vc-quest-debug-log-list::-webkit-scrollbar,
+.vc-quest-debug-json-pre::-webkit-scrollbar,
+.vc-quest-region-list::-webkit-scrollbar,
+.vc-quest-settings-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.vc-quest-tab-body::-webkit-scrollbar-track,
+.vc-quest-list::-webkit-scrollbar-track,
+.vc-quest-vault-list::-webkit-scrollbar-track,
+.vc-quest-debug-log-list::-webkit-scrollbar-track,
+.vc-quest-debug-json-pre::-webkit-scrollbar-track,
+.vc-quest-region-list::-webkit-scrollbar-track,
+.vc-quest-settings-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.vc-quest-tab-body::-webkit-scrollbar-thumb,
+.vc-quest-list::-webkit-scrollbar-thumb,
+.vc-quest-vault-list::-webkit-scrollbar-thumb,
+.vc-quest-debug-log-list::-webkit-scrollbar-thumb,
+.vc-quest-debug-json-pre::-webkit-scrollbar-thumb,
+.vc-quest-region-list::-webkit-scrollbar-thumb,
+.vc-quest-settings-container::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-auto-thumb, rgba(255, 255, 255, 0.2));
+    border-radius: 4px;
+}
+
+.vc-quest-tab-body::-webkit-scrollbar-thumb:hover,
+.vc-quest-list::-webkit-scrollbar-thumb:hover,
+.vc-quest-vault-list::-webkit-scrollbar-thumb:hover,
+.vc-quest-debug-log-list::-webkit-scrollbar-thumb:hover,
+.vc-quest-debug-json-pre::-webkit-scrollbar-thumb:hover,
+.vc-quest-region-list::-webkit-scrollbar-thumb:hover,
+.vc-quest-settings-container::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-auto-thumb-hover, rgba(255, 255, 255, 0.35));
 }
 
 .vc-quest-list-item {
@@ -670,7 +726,22 @@
     gap: 16px;
     padding: 0 16px;
     border-bottom: 1px solid var(--background-modifier-accent);
-    margin-top: 16px;
+    margin-top: 4px;
+    flex-shrink: 0;
+}
+
+.vc-quest-tab-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: calc(88vh - 210px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-right: 6px;
+    padding-bottom: 8px;
+    scroll-behavior: smooth;
 }
 
 .vc-quest-tab {
@@ -1082,7 +1153,7 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding: 20px;
+    padding: 4px 2px 16px 2px;
     animation: vc-quest-fade-in 0.3s ease;
 }
 
@@ -1371,4 +1442,282 @@
     font-family: Consolas, monospace;
     font-size: 12px;
 }
+
+/* ==========================================================================
+   In-Modal Settings View Styles
+   ========================================================================== */
+
+.vc-quest-settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    animation: vc-quest-fade-in 0.3s ease;
+}
+
+.vc-quest-settings-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(88, 101, 242, 0.12), rgba(235, 69, 158, 0.04));
+    border: 1px solid rgba(88, 101, 242, 0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    gap: 12px;
+}
+
+.vc-quest-settings-main-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--header-primary, #ffffff);
+}
+
+.vc-quest-settings-main-desc {
+    margin: 4px 0 0 0;
+    font-size: 12px;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-quest-settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vc-quest-settings-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 4px;
+}
+
+.vc-quest-settings-section-icon {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.vc-quest-settings-section-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--header-primary, #ffffff);
+    letter-spacing: -0.2px;
+}
+
+.vc-quest-settings-section-sub {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted, #949ba4);
+    margin-top: 1px;
+}
+
+.vc-quest-settings-card {
+    background: var(--background-secondary, #2b2d31);
+    border: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.06));
+    border-radius: 12px;
+    padding: 6px 14px;
+    display: flex;
+    flex-direction: column;
+    transition: border-color 0.15s ease;
+}
+
+.vc-quest-settings-card:hover {
+    border-color: rgba(88, 101, 242, 0.25);
+}
+
+.vc-quest-settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.04));
+    gap: 16px;
+}
+
+.vc-quest-settings-row:last-child {
+    border-bottom: none;
+}
+
+.vc-quest-settings-row.vertical {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vc-quest-settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+}
+
+.vc-quest-settings-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--header-primary, #ffffff);
+}
+
+.vc-quest-settings-hint {
+    font-size: 11px;
+    color: var(--text-muted, #949ba4);
+    line-height: 1.4;
+}
+
+.vc-quest-settings-hint code {
+    background: var(--background-tertiary, #1e1f22);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 10px;
+    color: #e0af68;
+    font-family: Consolas, monospace;
+}
+
+.vc-quest-settings-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vc-quest-settings-badge-val {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-normal, #dbdee1);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    min-width: 36px;
+    text-align: center;
+    font-family: Consolas, monospace;
+}
+
+.vc-quest-settings-badge-val.brand {
+    background: rgba(88, 101, 242, 0.2);
+    color: #8591f5;
+}
+
+/* Custom Range Slider */
+.vc-quest-settings-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 140px;
+    height: 6px;
+    background: var(--background-tertiary, #1e1f22);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.vc-quest-settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--brand-experiment, #5865F2);
+    box-shadow: 0 0 6px rgba(88, 101, 242, 0.6);
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.vc-quest-settings-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.8);
+}
+
+/* Custom Modern Toggle Switch */
+.vc-quest-settings-toggle {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.vc-quest-settings-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.vc-quest-settings-toggle-track {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--background-tertiary, #1e1f22);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 24px;
+}
+
+.vc-quest-settings-toggle-track::before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 2px;
+    bottom: 2px;
+    background-color: #ffffff;
+    transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vc-quest-settings-toggle input:checked + .vc-quest-settings-toggle-track {
+    background-color: var(--brand-experiment, #5865F2);
+    border-color: var(--brand-experiment, #5865F2);
+}
+
+.vc-quest-settings-toggle input:checked + .vc-quest-settings-toggle-track::before {
+    transform: translateX(20px);
+}
+
+/* Modern Select Dropdown */
+.vc-quest-settings-select {
+    background: var(--background-tertiary, #1e1f22);
+    color: var(--text-normal, #dbdee1);
+    border: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.vc-quest-settings-select:focus {
+    border-color: var(--brand-experiment, #5865F2);
+}
+
+/* Modern Input Group */
+.vc-quest-settings-input-group {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+}
+
+.vc-quest-settings-text-input {
+    flex: 1;
+    background: var(--background-tertiary, #1e1f22);
+    border: 1px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    padding: 7px 12px;
+    color: var(--text-normal, #dbdee1);
+    font-size: 12px;
+    font-family: Consolas, monospace;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+.vc-quest-settings-text-input:focus {
+    border-color: var(--brand-experiment, #5865F2);
+}
+
 

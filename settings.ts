@@ -195,7 +195,7 @@ export const settings = definePluginSettings({
         description:
             "Delay (seconds) between consecutive quest enrollments to prevent Discord 429 rate limits.",
         default: 3,
-        markers: [1, 2, 3, 5, 8, 12],
+        markers: [1, 2, 3, 5, 8, 10, 15, 20, 30],
         stickToMarkers: true,
     },
     autoEnrollNewQuests: {
