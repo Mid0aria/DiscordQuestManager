@@ -11,7 +11,7 @@ import { withRetry } from "../core/http";
 import { debugLog, getRemainingRateLimitSec, isCurrentlyRateLimited, log, markRateLimited, sleep } from "../core/state";
 import { QuestActions, QuestsStore } from "../core/stores";
 import { settings } from "../settings";
-import { Quest, QuestTaskInfo, SUPPORTED_TASKS, SupportedTask } from "../types";
+import { NormalizedQuest, Quest, QuestTaskInfo, SUPPORTED_TASKS, SupportedTask } from "../types";
 
 export const failedEnrollmentQuestIds = new Set<string>();
 
@@ -57,17 +57,77 @@ export function isQuestStarted(quest: Quest): boolean {
     return isNaN(time) || time <= Date.now();
 }
 
+export function getQuestEnrolledAt(quest: Quest): string | null {
+    const status = quest.userStatus ?? quest.user_status;
+    const storeStatus = QuestsStore?.quests?.get(quest.id)?.userStatus ?? (QuestsStore?.quests?.get(quest.id) as any)?.user_status;
+    return status?.enrolledAt ?? status?.enrolled_at ?? storeStatus?.enrolledAt ?? storeStatus?.enrolled_at ?? null;
+}
+
+export function isQuestEnrolled(quest: Quest): boolean {
+    return !!getQuestEnrolledAt(quest);
+}
+
+export function getQuestCompletedAt(quest: Quest): string | null {
+    const status = quest.userStatus ?? quest.user_status;
+    const storeStatus = QuestsStore?.quests?.get(quest.id)?.userStatus ?? (QuestsStore?.quests?.get(quest.id) as any)?.user_status;
+    return status?.completedAt ?? status?.completed_at ?? storeStatus?.completedAt ?? storeStatus?.completed_at ?? null;
+}
+
+export function isQuestCompleted(quest: Quest): boolean {
+    if (getQuestCompletedAt(quest)) return true;
+    const info = getTaskInfo(quest);
+    return info.target > 0 && info.progress >= info.target;
+}
+
+export function getQuestClaimedAt(quest: Quest): string | null {
+    const status = quest.userStatus ?? quest.user_status;
+    const storeStatus = QuestsStore?.quests?.get(quest.id)?.userStatus ?? (QuestsStore?.quests?.get(quest.id) as any)?.user_status;
+    return status?.claimedAt ?? status?.claimed_at ?? storeStatus?.claimedAt ?? storeStatus?.claimed_at ?? null;
+}
+
+export function isQuestClaimed(quest: Quest): boolean {
+    return !!getQuestClaimedAt(quest);
+}
+
+export function normalizeQuest(quest: Quest): NormalizedQuest {
+    const reward = getQuestReward(quest);
+    const expiresAt = getQuestExpiresAt(quest) || null;
+    const enrolledAt = getQuestEnrolledAt(quest);
+    const completedAt = getQuestCompletedAt(quest);
+    const claimedAt = getQuestClaimedAt(quest);
+    const taskInfo = getTaskInfo(quest);
+    const isTargeted = !!(quest.isTargeted ?? quest.is_targeted);
+    const trafficMetadata = quest.trafficMetadata ?? quest.traffic_metadata_sealed ?? null;
+    const configVersion = quest.config?.configVersion ?? quest.config?.config_version ?? (quest.config as any)?.configVersion ?? 2;
+
+    return {
+        id: quest.id,
+        name: getQuestName(quest),
+        gameTitle: quest.config?.messages?.gameTitle || quest.config?.messages?.game_title,
+        gamePublisher: quest.config?.messages?.gamePublisher || quest.config?.messages?.game_publisher,
+        rewardName: reward.name,
+        orbs: reward.orbs,
+        expiresAt,
+        isExpired: isQuestExpired(quest),
+        enrolledAt,
+        isEnrolled: !!enrolledAt,
+        completedAt,
+        isCompleted: isQuestCompleted(quest),
+        claimedAt,
+        isClaimed: !!claimedAt,
+        taskInfo,
+        configVersion,
+        isTargeted,
+        trafficMetadata,
+        raw: quest
+    };
+}
+
 export function isQuestValidForEnrollment(quest: Quest): boolean {
     if (!quest || !quest.id) return false;
     if (failedEnrollmentQuestIds.has(quest.id)) return false;
-
-    const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
-    const isCompleted = !!(status?.completedAt || status?.completed_at);
-    if (isCompleted) return false;
-
-    const isEnrolled = !!(status?.enrolledAt || status?.enrolled_at);
-    if (isEnrolled) return false;
-
+    if (isQuestCompleted(quest)) return false;
+    if (isQuestEnrolled(quest)) return false;
     if (isQuestExpired(quest)) return false;
     if (!isQuestStarted(quest)) return false;
 
@@ -176,11 +236,7 @@ export function buildQueue(): Quest[] {
     const quests = [...QuestsStore.quests.values()] as Quest[];
     const filtered = quests
         .filter(x => {
-            const status = x.userStatus ?? x.user_status ?? (x as any)?.user_status;
-            const enrolledAt = status?.enrolledAt ?? status?.enrolled_at;
-            const completedAt = status?.completedAt ?? status?.completed_at;
-            if (!enrolledAt || completedAt) return false;
-
+            if (!isQuestEnrolled(x) || isQuestCompleted(x)) return false;
             if (isQuestExpired(x)) return false;
 
             const info = getTaskInfo(x);
@@ -199,11 +255,7 @@ export function getUnenrolledQuests(): Quest[] {
     const { store } = settings;
     const quests = [...QuestsStore.quests.values()] as Quest[];
     return quests.filter(x => {
-        const status = x.userStatus ?? x.user_status ?? (x as any)?.user_status;
-        const enrolledAt = status?.enrolledAt ?? status?.enrolled_at;
-        const completedAt = status?.completedAt ?? status?.completed_at;
-        if (enrolledAt || completedAt) return false;
-
+        if (isQuestEnrolled(x) || isQuestCompleted(x)) return false;
         if (isQuestExpired(x)) return false;
 
         const info = getTaskInfo(x);
@@ -369,13 +421,15 @@ export async function claimQuestReward(quest: Quest): Promise<{ success: boolean
         const reward = getQuestReward(quest);
         const taskInfo = getTaskInfo(quest);
         const questName = getQuestName(quest);
+        const expiresAt = getQuestExpiresAt(quest) || undefined;
         await addQuestToHistory(
             quest.id,
             questName,
             reward.name,
             reward.orbs,
             code,
-            taskInfo.name
+            taskInfo.name,
+            expiresAt
         );
 
         if (code) {

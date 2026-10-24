@@ -158,7 +158,7 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
             return;
         }
 
-        const lines = codes.map(c => `Quest: ${c.name}\nReward: ${c.rewardName}\nCode: ${c.code}\nStatus: ${c.codeUsed ? "USED" : "AVAILABLE"}\nDate: ${new Date(c.date).toLocaleString()}\n-------------------------`);
+        const lines = codes.map(c => `Quest: ${c.name}\nReward: ${c.rewardName}\nCode: ${c.code}\nStatus: ${c.codeUsed ? "USED" : "AVAILABLE"}${c.expiresAt ? `\nExpires: ${new Date(c.expiresAt).toLocaleString()}` : ""}\nDate: ${new Date(c.date).toLocaleString()}\n-------------------------`);
         const blob = new Blob([lines.join("\n\n")], { type: "text/plain" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
@@ -719,6 +719,32 @@ export function QuestManagerModal({ props }: QuestManagerModalProps) {
                                             <div className="vc-quest-vault-card-main">
                                                 <div className="vc-quest-vault-card-title">
                                                     <span>{h.name}</span>
+                                                    {h.expiresAt && (() => {
+                                                        const remainingMs = new Date(h.expiresAt).getTime() - Date.now();
+                                                        if (remainingMs <= 0) {
+                                                            return <span className="vc-quest-badge-expired" style={{ background: "rgba(237, 66, 69, 0.2)", color: "#f23f43", padding: "2px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: 600 }}>⛔ Expired</span>;
+                                                        }
+                                                        const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+                                                        const hours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                                        const label = days > 0 ? `${days}d left` : `${hours}h left`;
+                                                        const isUrgent = days <= 3;
+                                                        return (
+                                                            <span
+                                                                className="vc-quest-badge-expiry"
+                                                                style={{
+                                                                    background: isUrgent ? "rgba(237, 66, 69, 0.2)" : "rgba(240, 178, 50, 0.2)",
+                                                                    color: isUrgent ? "#f23f43" : "#f0b232",
+                                                                    padding: "2px 6px",
+                                                                    borderRadius: "4px",
+                                                                    fontSize: "11px",
+                                                                    fontWeight: 600
+                                                                }}
+                                                                title={`Expires: ${new Date(h.expiresAt).toLocaleString()}`}
+                                                            >
+                                                                ⏳ {label}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                     {h.codeUsed && <span className="vc-quest-badge-used">USED</span>}
                                                 </div>
                                                 <div className="vc-quest-vault-card-reward">

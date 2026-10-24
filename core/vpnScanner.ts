@@ -6,13 +6,13 @@
 
 import { RestAPI, SelectedChannelStore } from "@webpack/common";
 
-import { enroll, getQuestName, getTaskInfo, isQuestExpired, isQuestValidForEnrollment, sortQuests } from "../api/questApi";
+import { enroll, getQuestName, getTaskInfo, isQuestCompleted, isQuestEnrolled, isQuestExpired, isQuestValidForEnrollment, sortQuests } from "../api/questApi";
 import { vpnClient } from "../api/vpnClient";
 import { settings } from "../settings";
 import { Quest } from "../types";
 import { AppState, debugLog, getRemainingRateLimitSec, isCurrentlyRateLimited, isRunning, log, sleep } from "./state";
 import { IdleStore, QuestActions, QuestsStore, RunningGameStore, StreamingStore } from "./stores";
-import { runWorker } from "./worker";
+import { isOutsideScheduledHours, isUserStatusDisallowed, runWorker } from "./worker";
 
 export interface RegionScanSummary {
     region: string;
@@ -63,6 +63,14 @@ function hasConflict(): { conflict: boolean; reason?: string } {
         }
     }
 
+    if (isOutsideScheduledHours()) {
+        return { conflict: true, reason: "Outside scheduled active hours." };
+    }
+
+    if (isUserStatusDisallowed()) {
+        return { conflict: true, reason: "Discord status is Offline / Invisible." };
+    }
+
     return { conflict: false };
 }
 
@@ -92,14 +100,10 @@ async function processDiscoveredQuests(
         // Discard expired quests immediately - never try to enroll ended campaigns!
         if (isQuestExpired(q)) continue;
 
-        const status = q.userStatus ?? q.user_status ?? (q as any)?.user_status;
-        const isCompleted = !!(status?.completedAt || status?.completed_at);
-        if (isCompleted) continue;
+        if (isQuestCompleted(q)) continue;
 
-        const isStoreEnrolled = !!(QuestsStore?.quests?.get(q.id)?.userStatus?.enrolledAt || (QuestsStore?.quests?.get(q.id) as any)?.user_status?.enrolled_at);
         const isAlreadyQueued = AppState.queue.some(queued => queued.id === q.id);
-        const isEnrolled = !!(status?.enrolledAt || status?.enrolled_at) || isStoreEnrolled || isAlreadyQueued || enrolledQuestIds.has(q.id);
-        if (isEnrolled) continue;
+        if (isQuestEnrolled(q) || isAlreadyQueued || enrolledQuestIds.has(q.id)) continue;
 
         // Check if valid according to user settings and task eligibility
         if (!isQuestValidForEnrollment(q)) continue;
@@ -204,6 +208,7 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
     lastResults = [];
     let totalEnrolled = 0;
     let totalFound = 0;
+    let vpnConnectedDuringScan = false;
 
     try {
         // Step 1: Scan local connection (unless explicitly vpnOnly)
@@ -270,6 +275,7 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
                         try {
                             const connectTimeout = Math.max(10, settings.store.vpnConnectTimeoutSec ?? 25);
                             await vpnClient.connect(region, connectTimeout);
+                            vpnConnectedDuringScan = true;
 
                             const cooldownSec = Math.max(2, settings.store.vpnCooldownSec ?? 10);
                             debugLog(`[VPN Scanner] Waiting ${cooldownSec}s cooldown for IP propagation...`);
@@ -330,6 +336,7 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
                                 debugLog("[VPN Scanner] Failed to disconnect VPN:", e);
                             }
                         }
+                        vpnConnectedDuringScan = false;
                     }
                 }
             }
@@ -367,6 +374,17 @@ export async function scanRegionsNow(options: { manual?: boolean; vpnOnly?: bool
             error: msg
         };
     } finally {
+        if (vpnConnectedDuringScan && settings.store.vpnDisconnectAfterScan) {
+            try {
+                log("🛡️ [VPN Killswitch] Executing fail-safe disconnect...", "warn");
+                await Promise.race([
+                    vpnClient.disconnect(10),
+                    new Promise(r => setTimeout(r, 12000))
+                ]);
+            } catch (killErr) {
+                debugLog("[VPN Killswitch] Fail-safe disconnect error:", killErr);
+            }
+        }
         isScanning = false;
         currentRegion = null;
     }

@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { FluxDispatcher, RestAPI } from "@webpack/common";
+import { FluxDispatcher, RestAPI, SelectedChannelStore, UserStore } from "@webpack/common";
 
 import { getQuestName, getTaskApplicationId } from "./questApi";
 import { withRetry } from "../core/http";
 import { AppState, isRunning, log, sleep } from "../core/state";
-import { ChannelStore, GuildChannelStore, RunningGameStore, StreamingStore } from "../core/stores";
+import { ChannelStore, GuildChannelStore, RunningGameStore, StreamingStore, VoiceStateStore } from "../core/stores";
 import { settings } from "../settings";
 import { Quest, QuestTaskInfo } from "../types";
 
@@ -65,7 +65,8 @@ export async function watchVideo(quest: Quest, taskInfo: QuestTaskInfo): Promise
 export async function spoofDispatcherEvent(
     quest: Quest,
     taskInfo: QuestTaskInfo,
-    spooferSetup: () => () => void
+    spooferSetup: () => () => void,
+    onHeartbeatTick?: () => void
 ): Promise<void> {
     const questName = getQuestName(quest);
     if (typeof (window as any).DiscordNative === "undefined") {
@@ -91,6 +92,12 @@ export async function spoofDispatcherEvent(
             if (AppState.pauseManager.isPaused) return;
 
             AppState.nextHeartbeatTime = Date.now() + 60000;
+
+            if (settings.store.stealthMode) {
+                try {
+                    onHeartbeatTick?.();
+                } catch { }
+            }
 
             const configVersion = quest.config.configVersion ?? quest.config.config_version ?? (quest.config as any)?.configVersion ?? 2;
             const status = data?.userStatus ?? data?.user_status;
@@ -153,7 +160,8 @@ export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promis
         pid: 1337,
         pidPath: [1337],
         processName: appData.name,
-        start: Date.now()
+        start: Date.now(),
+        lastFocused: Date.now()
     };
     const realGames = RunningGameStore.getRunningGames();
 
@@ -177,6 +185,8 @@ export async function playDesktop(quest: Quest, taskInfo: QuestTaskInfo): Promis
         };
         AppState.spoofers.setupGame = setupGame;
         return setupGame();
+    }, () => {
+        fakeGame.lastFocused = Date.now();
     });
 }
 
@@ -187,6 +197,20 @@ export async function streamDesktop(quest: Quest, taskInfo: QuestTaskInfo): Prom
         log(`Could not determine application ID for: ${questName}`, "error", true);
         throw new Error("Missing application ID.");
     }
+
+    // Check voice channel and viewer count
+    try {
+        const voiceChannelId = SelectedChannelStore?.getVoiceChannelId?.();
+        if (voiceChannelId && VoiceStateStore?.getVoiceStatesForChannel) {
+            const states = VoiceStateStore.getVoiceStatesForChannel(voiceChannelId);
+            const myId = UserStore?.getCurrentUser?.()?.id;
+            const otherUsers = Object.values(states || {}).filter((s: any) => s.userId !== myId);
+            if (otherUsers.length === 0) {
+                log(`Notice (${questName}): No other viewers detected in voice channel. Discord may require at least 1 viewer to progress stream quests.`, "warn", true);
+            }
+        }
+    } catch { }
+
     const originalFunc = StreamingStore.getStreamerActiveStreamMetadata;
 
     return spoofDispatcherEvent(quest, taskInfo, () => {

@@ -118,6 +118,7 @@ export function QuestOverlay() {
 
     const { currentQuest, pauseManager, activeWorker, queue } = AppState;
     if (!currentQuest && queue.length === 0) return null;
+    if (settings.store.overlayAutoHide && (!currentQuest || !activeWorker)) return null;
 
     const currentInfo = currentQuest
         ? getTaskInfo((QuestsStore?.quests?.get(currentQuest.id) as Quest) ?? currentQuest)
@@ -131,7 +132,7 @@ export function QuestOverlay() {
 
     const totalETA = calculateTotalQueueETA(queue, currentQuest);
     const isPill = settings.store.overlayStyle === "pill";
-    const baseOpacity = (settings.store.overlayOpacity ?? 85) / 100;
+    const baseOpacity = Math.max(0.2, Math.min(1, (settings.store.overlayOpacity ?? 85) / 100));
 
     const onHeaderMouseDown = (e: React.MouseEvent) => {
         if ((e.target as HTMLElement).closest("button") || !rootRef.current) return;
@@ -149,6 +150,7 @@ export function QuestOverlay() {
 
     const positionStyle: React.CSSProperties = {
         opacity: isDragging ? 1 : baseOpacity,
+        transition: isDragging ? "none" : "opacity 0.2s ease",
         ...(position ? { position: "fixed", left: position.x, top: position.y, right: "auto", bottom: "auto" } : {})
     };
 

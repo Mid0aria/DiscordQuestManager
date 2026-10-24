@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { SelectedChannelStore } from "@webpack/common";
+import { SelectedChannelStore, UserStore } from "@webpack/common";
 
-import { buildQueue, claimQuestReward, enroll, getQuestName, getTaskInfo, getUnenrolledQuests, sortQuests } from "../api/questApi";
+import { buildQueue, claimQuestReward, enroll, getQuestName, getTaskInfo, getUnenrolledQuests, isQuestCompleted, isQuestEnrolled, sortQuests } from "../api/questApi";
 import { playActivity, playDesktop, streamDesktop, watchVideo } from "../api/taskHandlers";
 import { settings } from "../settings";
 import { Quest } from "../types";
 import { playQuestCompleteSound } from "../utils/sound";
 import { AppState, getRemainingRateLimitSec, isCurrentlyRateLimited, isRunning, log, setRunning } from "./state";
-import { IdleStore, QuestsStore, RunningGameStore, StreamingStore } from "./stores";
+import { IdleStore, QuestsStore, RunningGameStore, StatusStore, StreamingStore } from "./stores";
 
 function hasGameOrStreamConflict(): boolean {
     if (!settings.store.pauseOnGameConflict) return false;
@@ -33,6 +33,31 @@ function isUserActiveWhenIdleOnly(): boolean {
         return !IdleStore.isIdle();
     }
     return false;
+}
+
+export function isOutsideScheduledHours(): boolean {
+    if (!settings.store.enableScheduler) return false;
+    const start = settings.store.scheduleStartHour ?? 10;
+    const end = settings.store.scheduleEndHour ?? 23;
+    const currentHour = new Date().getHours();
+
+    const isActive = start <= end
+        ? (currentHour >= start && currentHour < end)
+        : (currentHour >= start || currentHour < end);
+
+    return !isActive;
+}
+
+export function isUserStatusDisallowed(): boolean {
+    if (!settings.store.runOnlyWhenOnline) return false;
+    try {
+        const userId = UserStore?.getCurrentUser?.()?.id;
+        if (!userId || !StatusStore) return false;
+        const status = StatusStore?.getStatus?.(userId);
+        return status === "invisible" || status === "offline";
+    } catch {
+        return false;
+    }
 }
 
 export async function runWorker(): Promise<void> {
@@ -75,6 +100,24 @@ export async function runWorker(): Promise<void> {
             if (isRunning && !AppState.pauseManager.isPaused) log("Discord is idle, resuming quests...", "info", true);
         }
 
+        if (isOutsideScheduledHours()) {
+            const start = settings.store.scheduleStartHour ?? 10;
+            const end = settings.store.scheduleEndHour ?? 23;
+            log(`Quest paused: Outside scheduled active hours (${start}:00 - ${end}:00)...`, "info", true);
+            while (isOutsideScheduledHours() && isRunning && !AppState.pauseManager.isPaused) {
+                await new Promise(r => setTimeout(r, 30000));
+            }
+            if (isRunning && !AppState.pauseManager.isPaused) log("Active hours reached, resuming quests...", "info", true);
+        }
+
+        if (isUserStatusDisallowed()) {
+            log("Quest paused: Discord status is Offline / Invisible...", "info", true);
+            while (isUserStatusDisallowed() && isRunning && !AppState.pauseManager.isPaused) {
+                await new Promise(r => setTimeout(r, 10000));
+            }
+            if (isRunning && !AppState.pauseManager.isPaused) log("Discord status is active, resuming quests...", "info", true);
+        }
+
         if (!isRunning) break;
 
         const rawQuest = AppState.queue.shift()!;
@@ -84,9 +127,7 @@ export async function runWorker(): Promise<void> {
 
         try {
             const taskInfo = getTaskInfo(quest);
-            const status = quest.userStatus ?? quest.user_status ?? (quest as any)?.user_status;
-            const isStoreEnrolled = !!(QuestsStore?.quests?.get(quest.id)?.userStatus?.enrolledAt || (QuestsStore?.quests?.get(quest.id) as any)?.user_status?.enrolled_at);
-            let enrolled = !!(status?.enrolledAt || status?.enrolled_at || isStoreEnrolled);
+            let enrolled = isQuestEnrolled(quest);
 
             if (!enrolled) {
                 enrolled = await enroll(quest);
@@ -98,8 +139,7 @@ export async function runWorker(): Promise<void> {
                 continue;
             }
 
-            const isCompleted = !!(status?.completedAt || status?.completed_at);
-            if (isCompleted || (taskInfo.target > 0 && taskInfo.progress >= taskInfo.target)) {
+            if (isQuestCompleted(quest)) {
                 const questName = getQuestName(quest);
                 log(`Quest "${questName}" is already completed! Claiming reward if needed...`, "info", true);
                 if (settings.store.autoClaimRewards) {
@@ -114,10 +154,20 @@ export async function runWorker(): Promise<void> {
                 continue;
             }
 
-            if (taskInfo.name.includes("VIDEO")) await watchVideo(quest, taskInfo);
-            else if (taskInfo.name === "PLAY_ON_DESKTOP") await playDesktop(quest, taskInfo);
-            else if (taskInfo.name === "STREAM_ON_DESKTOP") await streamDesktop(quest, taskInfo);
-            else if (taskInfo.name === "PLAY_ACTIVITY") await playActivity(quest, taskInfo);
+            if (taskInfo.name.includes("VIDEO")) {
+                await watchVideo(quest, taskInfo);
+            } else if (
+                taskInfo.name === "PLAY_ON_DESKTOP" ||
+                taskInfo.name === "PLAY_ON_XBOX" ||
+                taskInfo.name === "PLAY_ON_PLAYSTATION" ||
+                taskInfo.name === "PLAY_ON_MOBILE"
+            ) {
+                await playDesktop(quest, taskInfo);
+            } else if (taskInfo.name === "STREAM_ON_DESKTOP") {
+                await streamDesktop(quest, taskInfo);
+            } else if (taskInfo.name === "PLAY_ACTIVITY") {
+                await playActivity(quest, taskInfo);
+            }
 
             processedCount++;
 

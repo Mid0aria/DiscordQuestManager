@@ -24,15 +24,16 @@ export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promis
 
             let waitMs = Math.pow(2, attempt) * 1000;
             if (isRateLimit) {
-                markRateLimited();
                 const retryAfterSec = typeof e?.body?.retry_after === "number"
                     ? e.body.retry_after
                     : typeof e?.headers?.["retry-after"] === "string"
                         ? parseFloat(e.headers["retry-after"])
-                        : 1;
-                waitMs = Math.min(60000, Math.max(500, retryAfterSec * 1000));
+                        : Math.min(60, Math.pow(2, attempt) * 2);
+                markRateLimited(retryAfterSec);
+                waitMs = Math.min(60000, Math.max(1000, Math.round(retryAfterSec * 1000 * (0.9 + Math.random() * 0.25))));
                 log(`Rate limited (429), retrying in ${(waitMs / 1000).toFixed(1)}s... (${attempt}/${maxRetries})`, "warn");
             } else {
+                waitMs = Math.round(waitMs * (0.85 + Math.random() * 0.3));
                 log(`Discord server error (${e?.status}), retrying in ${(waitMs / 1000).toFixed(1)}s... (${attempt}/${maxRetries})`, "warn");
             }
 

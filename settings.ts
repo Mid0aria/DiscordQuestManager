@@ -62,6 +62,25 @@ export const settings = definePluginSettings({
             "Play a celebratory chime sound when a quest is completed.",
         default: true,
     },
+    soundTheme: {
+        type: OptionType.SELECT,
+        description: "Audio theme to play when a quest completes.",
+        default: "retro",
+        options: [
+            { label: "🕹️ Retro 8-bit Fanfare", value: "retro" },
+            { label: "🔔 Crystal Chime", value: "chime" },
+            { label: "🫧 Modern Bubble Pop", value: "pop" },
+            { label: "🪙 Arcade Coin / 1-Up", value: "arcade" },
+            { label: "🔇 Mute", value: "mute" },
+        ],
+    },
+    soundVolume: {
+        type: OptionType.SLIDER,
+        description: "Volume percentage for completion sound effects.",
+        default: 80,
+        markers: [10, 25, 50, 75, 100],
+        stickToMarkers: false,
+    },
     enableVideoQuests: {
         type: OptionType.BOOLEAN,
         description: "Enable watching video quests.",
@@ -109,6 +128,38 @@ export const settings = definePluginSettings({
             "Randomize heartbeat progress intervals and video speed slightly to appear more human.",
         default: true,
     },
+    stealthMode: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Advanced anti-detection engine: simulates window focus, input ticks, and natural human variance during active tasks.",
+        default: true,
+    },
+    enableScheduler: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Only process quests during specified hours of the day (e.g. 10:00 - 23:00).",
+        default: false,
+    },
+    scheduleStartHour: {
+        type: OptionType.SLIDER,
+        description: "Hour of the day to start processing quests (0-23).",
+        default: 10,
+        markers: [0, 6, 8, 10, 12, 14, 18],
+        stickToMarkers: false,
+    },
+    scheduleEndHour: {
+        type: OptionType.SLIDER,
+        description: "Hour of the day to pause processing quests (0-23).",
+        default: 23,
+        markers: [12, 16, 18, 20, 22, 23],
+        stickToMarkers: false,
+    },
+    runOnlyWhenOnline: {
+        type: OptionType.BOOLEAN,
+        description:
+            "Automatically pause quest processing if your Discord status is set to Invisible or Offline.",
+        default: false,
+    },
     logLevel: {
         type: OptionType.SELECT,
         description: "Control which notifications and logs are shown.",
@@ -141,6 +192,11 @@ export const settings = definePluginSettings({
         default: 85,
         markers: [40, 60, 75, 85, 100],
         stickToMarkers: false,
+    },
+    overlayAutoHide: {
+        type: OptionType.BOOLEAN,
+        description: "Automatically hide the overlay widget when no quest is active or in queue.",
+        default: false,
     },
     autoCheckUpdates: {
         type: OptionType.BOOLEAN,

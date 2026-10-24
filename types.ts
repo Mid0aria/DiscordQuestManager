@@ -9,7 +9,10 @@ export const SUPPORTED_TASKS = [
     "PLAY_ON_DESKTOP",
     "STREAM_ON_DESKTOP",
     "PLAY_ACTIVITY",
-    "WATCH_VIDEO_ON_MOBILE"
+    "WATCH_VIDEO_ON_MOBILE",
+    "PLAY_ON_XBOX",
+    "PLAY_ON_PLAYSTATION",
+    "PLAY_ON_MOBILE"
 ] as const;
 
 export type SupportedTask = typeof SUPPORTED_TASKS[number];
@@ -89,6 +92,28 @@ export interface Quest {
     trafficMetadata?: any;
     traffic_metadata_sealed?: any;
     _retryCount?: number;
+}
+
+export interface NormalizedQuest {
+    id: string;
+    name: string;
+    gameTitle?: string;
+    gamePublisher?: string;
+    rewardName: string;
+    orbs: number;
+    expiresAt: string | null;
+    isExpired: boolean;
+    enrolledAt: string | null;
+    isEnrolled: boolean;
+    completedAt: string | null;
+    isCompleted: boolean;
+    claimedAt: string | null;
+    isClaimed: boolean;
+    taskInfo: QuestTaskInfo;
+    configVersion: number;
+    isTargeted: boolean;
+    trafficMetadata: any;
+    raw: Quest;
 }
 
 export type WorkerStatus = "idle" | "running" | "paused" | "stopped";

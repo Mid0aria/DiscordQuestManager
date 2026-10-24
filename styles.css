@@ -1000,6 +1000,22 @@
     border-radius: 6px;
 }
 
+.vc-quest-badge-expired {
+    background: rgba(237, 66, 69, 0.2);
+    color: #f23f43;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
+.vc-quest-badge-expiry {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 6px;
+}
+
 .vc-quest-vault-card-reward {
     font-size: 12px;
     color: var(--text-muted);

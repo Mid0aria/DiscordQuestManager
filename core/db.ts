@@ -15,6 +15,7 @@ export interface QuestHistoryEntry {
     code?: string;
     codeUsed?: boolean;
     taskType?: string;
+    expiresAt?: string;
 }
 
 export interface UserStats {
@@ -66,7 +67,8 @@ export async function addQuestToHistory(
     rewardName: string,
     orbs: number,
     code?: string,
-    taskType?: string
+    taskType?: string,
+    expiresAt?: string
 ) {
     const db = await getDB();
     const stats = await getUserStats();
@@ -75,6 +77,7 @@ export async function addQuestToHistory(
     if (existing) {
         if (code && !existing.code) {
             existing.code = code;
+            if (expiresAt && !existing.expiresAt) existing.expiresAt = expiresAt;
             const tx = db.transaction(STORE_NAME, "readwrite");
             const store = tx.objectStore(STORE_NAME);
             store.put(stats);
@@ -92,7 +95,8 @@ export async function addQuestToHistory(
         orbs,
         code,
         codeUsed: false,
-        taskType
+        taskType,
+        expiresAt
     });
 
     return new Promise<void>((resolve, reject) => {

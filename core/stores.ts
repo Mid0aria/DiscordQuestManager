@@ -12,6 +12,8 @@ export let RunningGameStore: any = null;
 export let ChannelStore: any = null;
 export let GuildChannelStore: any = null;
 export let IdleStore: any = null;
+export let StatusStore: any = null;
+export let VoiceStateStore: any = null;
 
 waitFor(filters.byProps("getQuest"), s => { QuestsStore = s; });
 waitFor(filters.byStoreName("ApplicationStreamingStore"), s => { StreamingStore = s; });
@@ -19,6 +21,14 @@ waitFor(filters.byStoreName("RunningGameStore"), s => { RunningGameStore = s; })
 waitFor(filters.byStoreName("ChannelStore"), s => { ChannelStore = s; });
 waitFor(filters.byStoreName("GuildChannelStore"), s => { GuildChannelStore = s; });
 waitFor(filters.byProps("isIdle", "getIdleSince"), s => { IdleStore = s; });
+waitFor(filters.byStoreName("StatusStore"), s => { StatusStore = s; });
+if (!StatusStore) {
+    waitFor(filters.byProps("getStatus", "getState"), s => { StatusStore = s; });
+}
+waitFor(filters.byStoreName("VoiceStateStore"), s => { VoiceStateStore = s; });
+if (!VoiceStateStore) {
+    waitFor(filters.byProps("getVoiceStatesForChannel"), s => { VoiceStateStore = s; });
+}
 
 export let QuestActions: any = null;
 waitFor(filters.byProps("claimQuestReward"), s => { QuestActions = s; });

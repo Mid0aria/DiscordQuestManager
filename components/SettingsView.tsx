@@ -8,6 +8,7 @@ import { ButtonCompat } from "@components/Button";
 import { React, showToast, useState } from "@webpack/common";
 
 import { settings } from "../settings";
+import { playQuestCompleteSound, SOUND_THEMES } from "../utils/sound";
 import { openRegionPickerModal } from "./RegionPickerModal";
 
 export function SettingsView() {
@@ -463,6 +464,111 @@ export function SettingsView() {
                         </label>
                     </div>
 
+                    {/* Pause When Offline / Invisible */}
+                    <div className="vc-quest-settings-row">
+                        <div className="vc-quest-settings-info">
+                            <span className="vc-quest-settings-label">Pause When Offline / Invisible</span>
+                            <span className="vc-quest-settings-hint">
+                                Automatically pause quest processing if your Discord status is Invisible or Offline.
+                            </span>
+                        </div>
+                        <label className="vc-quest-settings-toggle">
+                            <input
+                                type="checkbox"
+                                checked={store.runOnlyWhenOnline}
+                                onChange={e => setBoolean("runOnlyWhenOnline", e.target.checked)}
+                            />
+                            <span className="vc-quest-settings-toggle-track" />
+                        </label>
+                    </div>
+
+                    {/* Advanced Stealth Engine */}
+                    <div className="vc-quest-settings-row">
+                        <div className="vc-quest-settings-info">
+                            <span className="vc-quest-settings-label">Advanced Stealth Engine</span>
+                            <span className="vc-quest-settings-hint">
+                                Simulates realistic human window focus ticks, micro-jitter, and input telemetry to avoid Discord bot detection.
+                            </span>
+                        </div>
+                        <label className="vc-quest-settings-toggle">
+                            <input
+                                type="checkbox"
+                                checked={store.stealthMode}
+                                onChange={e => setBoolean("stealthMode", e.target.checked)}
+                            />
+                            <span className="vc-quest-settings-toggle-track" />
+                        </label>
+                    </div>
+
+                    {/* Active Hours Schedule Toggle */}
+                    <div className="vc-quest-settings-row">
+                        <div className="vc-quest-settings-info">
+                            <span className="vc-quest-settings-label">Active Hours Schedule</span>
+                            <span className="vc-quest-settings-hint">
+                                Only run quest automation during specific hours of the day (e.g. 10:00 - 23:00).
+                            </span>
+                        </div>
+                        <label className="vc-quest-settings-toggle">
+                            <input
+                                type="checkbox"
+                                checked={store.enableScheduler}
+                                onChange={e => setBoolean("enableScheduler", e.target.checked)}
+                            />
+                            <span className="vc-quest-settings-toggle-track" />
+                        </label>
+                    </div>
+
+                    {/* Schedule Hours Sliders */}
+                    {store.enableScheduler && (
+                        <>
+                            <div className="vc-quest-settings-row">
+                                <div className="vc-quest-settings-info">
+                                    <span className="vc-quest-settings-label">Schedule Start Hour</span>
+                                    <span className="vc-quest-settings-hint">
+                                        Time of day to start processing quests.
+                                    </span>
+                                </div>
+                                <div className="vc-quest-settings-control">
+                                    <span className="vc-quest-settings-badge-val brand">
+                                        {(store.scheduleStartHour ?? 10).toString().padStart(2, "0")}:00
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={23}
+                                        step={1}
+                                        value={store.scheduleStartHour ?? 10}
+                                        onChange={e => setNumber("scheduleStartHour", parseInt(e.target.value, 10))}
+                                        className="vc-quest-settings-slider"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="vc-quest-settings-row">
+                                <div className="vc-quest-settings-info">
+                                    <span className="vc-quest-settings-label">Schedule End Hour</span>
+                                    <span className="vc-quest-settings-hint">
+                                        Time of day to pause processing quests.
+                                    </span>
+                                </div>
+                                <div className="vc-quest-settings-control">
+                                    <span className="vc-quest-settings-badge-val brand">
+                                        {(store.scheduleEndHour ?? 23).toString().padStart(2, "0")}:00
+                                    </span>
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={23}
+                                        step={1}
+                                        value={store.scheduleEndHour ?? 23}
+                                        onChange={e => setNumber("scheduleEndHour", parseInt(e.target.value, 10))}
+                                        className="vc-quest-settings-slider"
+                                    />
+                                </div>
+                            </div>
+                        </>
+                    )}
+
                     {/* Auto-Requeue Failed */}
                     <div className="vc-quest-settings-row">
                         <div className="vc-quest-settings-info">
@@ -661,7 +767,7 @@ export function SettingsView() {
                         <div className="vc-quest-settings-info">
                             <span className="vc-quest-settings-label">Play Completion Sound</span>
                             <span className="vc-quest-settings-hint">
-                                Play an uplifting chime sound whenever a quest successfully finishes.
+                                Play a celebratory audio effect whenever a quest successfully finishes.
                             </span>
                         </div>
                         <label className="vc-quest-settings-toggle">
@@ -673,6 +779,68 @@ export function SettingsView() {
                             <span className="vc-quest-settings-toggle-track" />
                         </label>
                     </div>
+
+                    {/* Sound Theme Selection & Test Button */}
+                    {store.playCompletionSound && (
+                        <div className="vc-quest-settings-row">
+                            <div className="vc-quest-settings-info">
+                                <span className="vc-quest-settings-label">Sound Theme</span>
+                                <span className="vc-quest-settings-hint">
+                                    Choose audio synthesizer theme for completion celebration.
+                                </span>
+                            </div>
+                            <div className="vc-quest-settings-control">
+                                <select
+                                    className="vc-quest-settings-select"
+                                    value={store.soundTheme || "retro"}
+                                    onChange={e => {
+                                        setString("soundTheme", e.target.value);
+                                        playQuestCompleteSound(e.target.value, store.soundVolume ?? 80);
+                                    }}
+                                >
+                                    {SOUND_THEMES.map(theme => (
+                                        <option key={theme.id} value={theme.id}>
+                                            {theme.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ButtonCompat
+                                    size={ButtonCompat.Sizes.MIN}
+                                    color={ButtonCompat.Colors.PRIMARY}
+                                    onClick={() => playQuestCompleteSound(store.soundTheme || "retro", store.soundVolume ?? 80)}
+                                    title="Test play the selected sound effect"
+                                >
+                                    ▶ Test
+                                </ButtonCompat>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sound Volume Slider */}
+                    {store.playCompletionSound && (
+                        <div className="vc-quest-settings-row">
+                            <div className="vc-quest-settings-info">
+                                <span className="vc-quest-settings-label">Sound Volume</span>
+                                <span className="vc-quest-settings-hint">
+                                    Volume level for completion audio effects.
+                                </span>
+                            </div>
+                            <div className="vc-quest-settings-control">
+                                <span className="vc-quest-settings-badge-val">
+                                    {store.soundVolume ?? 80}%
+                                </span>
+                                <input
+                                    type="range"
+                                    min={10}
+                                    max={100}
+                                    step={5}
+                                    value={store.soundVolume ?? 80}
+                                    onChange={e => setNumber("soundVolume", parseInt(e.target.value, 10))}
+                                    className="vc-quest-settings-slider"
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     {/* Toast Notification Level */}
                     <div className="vc-quest-settings-row">
@@ -762,7 +930,7 @@ export function SettingsView() {
                                 </span>
                                 <input
                                     type="range"
-                                    min={40}
+                                    min={20}
                                     max={100}
                                     step={5}
                                     value={store.overlayOpacity ?? 85}
@@ -770,6 +938,26 @@ export function SettingsView() {
                                     className="vc-quest-settings-slider"
                                 />
                             </div>
+                        </div>
+                    )}
+
+                    {/* Auto-Hide Overlay when inactive */}
+                    {store.showOverlay && (
+                        <div className="vc-quest-settings-row">
+                            <div className="vc-quest-settings-info">
+                                <span className="vc-quest-settings-label">Auto-Hide When Inactive</span>
+                                <span className="vc-quest-settings-hint">
+                                    Automatically hide the floating widget when no quest is running or queued.
+                                </span>
+                            </div>
+                            <label className="vc-quest-settings-toggle">
+                                <input
+                                    type="checkbox"
+                                    checked={store.overlayAutoHide}
+                                    onChange={e => setBoolean("overlayAutoHide", e.target.checked)}
+                                />
+                                <span className="vc-quest-settings-toggle-track" />
+                            </label>
                         </div>
                     )}
 
